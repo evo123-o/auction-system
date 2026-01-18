@@ -1,0 +1,33 @@
+package org.example.auction.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+/**
+ * 将本地上传目录映射为静态资源路径，便于通过 URL 访问上传的图片。
+
+ * 请在 application.properties 中配置：
+ * app.upload.dir=uploads
+ * app.upload.base-url=/uploads
+
+ * 然后通过 http://localhost:8080/uploads/{filename} 访问文件。
+ */
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
+
+    @Value("${app.upload.base-url:/uploads}")
+    private String uploadBaseUrl;
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 将 /uploads/** 映射到本地文件系统目录（注意 file: 前缀）
+        String location = "file:" + uploadDir + "/";
+        String pattern = uploadBaseUrl + "/**";
+        registry.addResourceHandler(pattern).addResourceLocations(location);
+    }
+}
