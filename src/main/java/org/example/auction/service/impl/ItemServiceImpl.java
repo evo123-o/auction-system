@@ -29,10 +29,10 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
 
     @Value("${app.upload.dir:uploads}")
-    private String uploadDir; // 本地文件系统目录
+    private String uploadDir;
 
     @Value("${app.upload.base-url:/uploads}")
-    private String uploadBaseUrl; // 外部访问前缀
+    private String uploadBaseUrl;
 
     public ItemServiceImpl(ItemMapper itemMapper) {
         this.itemMapper = itemMapper;
@@ -119,7 +119,7 @@ public class ItemServiceImpl implements ItemService {
         if (original != null && original.contains(".")) {
             ext = original.substring(original.lastIndexOf('.'));
         }
-        String filename = UUID.randomUUID().toString() + ext;
+        String filename = UUID.randomUUID() + ext;
         File dest = new File(dir, filename);
         file.transferTo(dest);
 
@@ -130,5 +130,16 @@ public class ItemServiceImpl implements ItemService {
         itemMapper.updateById(item);
 
         return imagePath;
+    }
+    //新增 updateImagePath 实现并保留原 saveImage 实现
+    @Override
+    @Transactional
+    public Item updateImagePath(Long itemId, String imageUrl) {
+        Item item = itemMapper.selectById(itemId);
+        if (item == null) return null;
+        item.setImagePath(imageUrl);
+        item.setUpdatedAt(LocalDateTime.now());
+        itemMapper.updateById(item);
+        return item;
     }
 }

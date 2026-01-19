@@ -37,4 +37,9 @@ public interface ItemService {
      * 上传图片并更新拍品的 imagePath 字段；返回相对/外部可访问路径
      */
     String saveImage(Long itemId, MultipartFile file) throws IOException;
+
+    /**
+     * 更新 item 的 imagePath 字段（不处理文件存储）
+     */
+    Item updateImagePath(Long itemId, String imageUrl);
 }

@@ -3,10 +3,14 @@ package org.example.auction.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
+import org.example.auction.Utils.SecurityUtils;
 import org.example.auction.dto.CreateItemRequest;
 import org.example.auction.dto.ItemDTO;
+import org.example.auction.dto.PageResponse;
 import org.example.auction.entity.Item;
 import org.example.auction.service.ItemService;
+import org.example.auction.service.UserService;
+import org.example.auction.storage.StorageService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +19,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * ItemController：分页、详情、创建、图片上传示例
+ * ItemController：带基于当前登录用户的权限校验、标准分页 DTO、图片上传通过 StorageService
  */
 @RestController
 @RequestMapping("/api/items")
@@ -26,15 +31,15 @@ import java.util.stream.Collectors;
 public class ItemController {
 
     private final ItemService itemService;
+    private final StorageService storageService;
+    private final UserService userService;
 
-    public ItemController(ItemService itemService) {
+    public ItemController(ItemService itemService, StorageService storageService, UserService userService) {
         this.itemService = itemService;
+        this.storageService = storageService;
+        this.userService = userService;
     }
 
-    /**
-     * 分页查询
-     * GET /api/items?page=1&size=10&title=foo&category=bar&status=RUNNING
-     */
     @GetMapping
     public ResponseEntity<?> list(
             @RequestParam(defaultValue = "1") int page,
@@ -46,45 +51,68 @@ public class ItemController {
         Page<Item> pg = new Page<>(page, size);
         IPage<Item> results = itemService.pageItems(pg, title, category, status);
         List<ItemDTO> dtoList = results.getRecords().stream().map(this::toDto).collect(Collectors.toList());
-        // 保留分页信息
-        return ResponseEntity.ok().body(new org.springframework.data.domain.PageImpl<>(dtoList,
-                org.springframework.data.domain.PageRequest.of(page - 1, size),
-                results.getTotal()));
+        long total = results.getTotal();
+        long pages = (total + size - 1) / size;
+        PageResponse<ItemDTO> resp = PageResponse.<ItemDTO>builder()
+                .total(total)
+                .pages(pages)
+                .current(page)
+                .size(size)
+                .records(dtoList)
+                .build();
+        return ResponseEntity.ok(resp);
     }
 
-    /**
-     * 详情
-     */
     @GetMapping("/{id}")
     public ResponseEntity<?> detail(@PathVariable Long id) {
         Item item = itemService.getById(id);
-        if (item == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("item not found");
-        }
+        if (item == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("item not found");
         return ResponseEntity.ok(toDto(item));
     }
 
-    /**
-     * 创建拍品（不包含图片）
-     */
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody CreateItemRequest req) {
-        // 这里示例未集成认证，将 createdBy 写为 null 或者从 SecurityContext 获取当前用户 id
-        Item created = itemService.create(req, null);
+        Optional<Long> optId = SecurityUtils.getCurrentUserId(userService);
+        if (optId.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
+        }
+        Item created = itemService.create(req, optId.get());
         return ResponseEntity.status(HttpStatus.CREATED).body(toDto(created));
     }
 
-    /**
-     * 上传图片并关联到拍品
-     * POST /api/items/{id}/image  Content-Type: multipart/form-data
-     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody CreateItemRequest req) {
+        Optional<Long> optId = SecurityUtils.getCurrentUserId(userService);
+        if (optId.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
+        }
+        Item existing = itemService.getById(id);
+        if (existing == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("item not found");
+        // 仅创建者或 ADMIN 能更新
+        if (!existing.getCreatedBy().equals(optId.get()) && !SecurityUtils.hasRole("ADMIN")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("没有权限修改该拍品");
+        }
+        Item updated = itemService.update(id, req);
+        return ResponseEntity.ok(toDto(updated));
+    }
+
     @PostMapping("/{id}/image")
     public ResponseEntity<?> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        Optional<Long> optId = SecurityUtils.getCurrentUserId(userService);
+        if (optId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
+
+        Item existing = itemService.getById(id);
+        if (existing == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("item not found");
+        // 仅创建者或 ADMIN 可以上传图片
+        if (!existing.getCreatedBy().equals(optId.get()) && !SecurityUtils.hasRole("ADMIN")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("没有权限为该拍品上传图片");
+        }
+
         try {
-            String imageUrl = itemService.saveImage(id, file);
-            return ResponseEntity.ok().body(java.util.Map.of("imageUrl", imageUrl));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(java.util.Map.of("error", ex.getMessage()));
+            String folder = "items/" + id;
+            String imageUrl = storageService.store(file, folder);
+            Item item = itemService.updateImagePath(id, imageUrl);
+            return ResponseEntity.ok().body(java.util.Map.of("imageUrl", imageUrl, "item", toDto(item)));
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Map.of("error", ex.getMessage()));
         }
@@ -94,7 +122,6 @@ public class ItemController {
         if (item == null) return null;
         ItemDTO dto = ItemDTO.builder().build();
         BeanUtils.copyProperties(item, dto);
-        // 将数据库的 image_path 映射到 DTO 的 imageUrl
         dto.setImageUrl(item.getImagePath());
         return dto;
     }
