@@ -7,6 +7,7 @@ import org.example.auction.dto.CreateItemRequest;
 import org.example.auction.entity.Item;
 import org.example.auction.mapper.ItemMapper;
 import org.example.auction.service.ItemService;
+import org.example.auction.storage.StorageService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,12 +22,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * ItemService 实现
+ * ItemService 实现（整合 StorageService）
  */
 @Service
 public class ItemServiceImpl implements ItemService {
 
     private final ItemMapper itemMapper;
+    private final StorageService storageService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -34,8 +36,9 @@ public class ItemServiceImpl implements ItemService {
     @Value("${app.upload.base-url:/uploads}")
     private String uploadBaseUrl;
 
-    public ItemServiceImpl(ItemMapper itemMapper) {
+    public ItemServiceImpl(ItemMapper itemMapper, StorageService storageService) {
         this.itemMapper = itemMapper;
+        this.storageService = storageService;
     }
 
     @Override
@@ -64,7 +67,6 @@ public class ItemServiceImpl implements ItemService {
     public Item create(CreateItemRequest req, Long createdBy) {
         Item item = new Item();
         BeanUtils.copyProperties(req, item);
-        // 确保数值默认
         if (item.getStartPrice() == null) item.setStartPrice(BigDecimal.ZERO);
         if (item.getCurrentPrice() == null) item.setCurrentPrice(item.getStartPrice());
         if (item.getDepositAmount() == null) item.setDepositAmount(BigDecimal.ZERO);
@@ -84,7 +86,6 @@ public class ItemServiceImpl implements ItemService {
         if (existing == null) {
             return null;
         }
-        // 这里只覆盖部分字段；也可用 UpdateWrapper 更细粒度控制
         existing.setTitle(req.getTitle());
         existing.setCategory(req.getCategory());
         existing.setDescription(req.getDescription());
@@ -97,6 +98,9 @@ public class ItemServiceImpl implements ItemService {
         return existing;
     }
 
+    /**
+     * 保存图片（通过 StorageService），并更新 item.imagePath
+     */
     @Override
     @Transactional
     public String saveImage(Long itemId, MultipartFile file) throws IOException {
@@ -107,31 +111,14 @@ public class ItemServiceImpl implements ItemService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("empty file");
         }
-
-        // 确保目录存在
-        File dir = new File(uploadDir);
-        if (!dir.exists()) {
-            Files.createDirectories(dir.toPath());
-        }
-
-        String original = file.getOriginalFilename();
-        String ext = "";
-        if (original != null && original.contains(".")) {
-            ext = original.substring(original.lastIndexOf('.'));
-        }
-        String filename = UUID.randomUUID() + ext;
-        File dest = new File(dir, filename);
-        file.transferTo(dest);
-
-        // 更新 item 的 imagePath（保存为相对路径或 URL）
-        String imagePath = uploadBaseUrl + "/" + filename;
-        item.setImagePath(imagePath);
+        String folder = "items/" + itemId;
+        String imageUrl = storageService.store(file, folder);
+        item.setImagePath(imageUrl);
         item.setUpdatedAt(LocalDateTime.now());
         itemMapper.updateById(item);
-
-        return imagePath;
+        return imageUrl;
     }
-    //新增 updateImagePath 实现并保留原 saveImage 实现
+
     @Override
     @Transactional
     public Item updateImagePath(Long itemId, String imageUrl) {
@@ -141,5 +128,23 @@ public class ItemServiceImpl implements ItemService {
         item.setUpdatedAt(LocalDateTime.now());
         itemMapper.updateById(item);
         return item;
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteById(Long id) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) return false;
+        // 尝试删除关联文件（如果 StorageService 支持）
+        String imagePath = item.getImagePath();
+        try {
+            if (imagePath != null && !imagePath.isBlank()) {
+                storageService.delete(imagePath);
+            }
+        } catch (Exception ignored) {
+            // 删除文件失败不应该阻止删除数据；记录日志可选
+        }
+        int rows = itemMapper.deleteById(id);
+        return rows > 0;
     }
 }

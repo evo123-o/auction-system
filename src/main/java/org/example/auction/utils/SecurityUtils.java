@@ -1,4 +1,4 @@
-package org.example.auction.Utils;
+package org.example.auction.utils;
 
 import org.example.auction.entity.User;
 import org.example.auction.service.UserService;
@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -25,7 +26,7 @@ public class SecurityUtils {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;
         for (GrantedAuthority ga : auth.getAuthorities()) {
-            if (ga.getAuthority().equals("ROLE_" + role) || ga.getAuthority().equals(role)) {
+            if (Objects.equals(ga.getAuthority(), "ROLE_" + role) || Objects.equals(ga.getAuthority(), role)) {
                 return true;
             }
         }

@@ -42,4 +42,9 @@ public interface ItemService {
      * 更新 item 的 imagePath 字段（不处理文件存储）
      */
     Item updateImagePath(Long itemId, String imageUrl);
+
+    /**
+     * 删除拍品（同时尝试删除关联的图片文件，视 StorageService 能力而定）
+     */
+    boolean deleteById(Long id);
 }
