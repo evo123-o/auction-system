@@ -24,7 +24,7 @@ public class ItemDTO {
     private String status;
     private Integer extendCount;
     private Integer maxExtend;
-    private String imageUrl; // 可直接用于前端展示
+    private String imageUrl;
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

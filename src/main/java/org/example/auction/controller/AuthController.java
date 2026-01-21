@@ -1,88 +1,69 @@
 package org.example.auction.controller;
 
 import jakarta.validation.Valid;
-import org.example.auction.dto.*;
-import org.example.auction.entity.User;
+import org.example.auction.dto.ApiResponse;
+import org.example.auction.dto.LoginRequest;
+import org.example.auction.security.JwtProperties;
+import org.example.auction.security.JwtTokenUtil;
+import org.example.auction.security.TokenBlacklistService;
 import org.example.auction.service.UserService;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.*;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Date;
+import java.util.Map;
+
 /**
- * 改进版认证控制器：
- * - POST /api/auth/register  注册（带重复用户名校验）
- * - POST /api/auth/login     登录（示例 - 使用 AuthenticationManager 验证）
- * - GET  /api/auth/ping      健康检查
- *
- * 说明：当前示例使用 Basic/JWT 可按需要替换，登录示例只是做验证演示（未发放 JWT）。
+ * AuthController：提供基于 JWT 的登录/登出示例
  */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final UserService userService;
     private final AuthenticationManager authenticationManager;
+    private final JwtTokenUtil jwtTokenUtil;
+    private final JwtProperties jwtProperties;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final UserService userService;
 
-    public AuthController(UserService userService, AuthenticationManager authenticationManager) {
-        this.userService = userService;
+    public AuthController(AuthenticationManager authenticationManager,
+                          JwtTokenUtil jwtTokenUtil,
+                          JwtProperties jwtProperties,
+                          TokenBlacklistService tokenBlacklistService,
+                          UserService userService) {
         this.authenticationManager = authenticationManager;
-    }
-
-    @GetMapping("/ping")
-    public ResponseEntity<String> ping() {
-        return ResponseEntity.ok("pong");
-    }
-
-    @GetMapping("/login")
-    public ResponseEntity<ApiResponse<String>> loginInfo() {
-        return ResponseEntity.ok(ApiResponse.ok("请使用 POST /api/auth/login 提交 JSON 格式的 {username,password} 进行登录"));
-    }
-
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserDTO>> register(@Valid @RequestBody RegisterRequest req) {
-        // 重复用户名检查
-        if (userService.findByUsername(req.getUsername()) != null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.fail("用户名已存在"));
-        }
-        User created = userService.register(req);
-        UserDTO dto = UserDTO.builder()
-                .id(created.getId())
-                .username(created.getUsername())
-                .email(created.getEmail())
-                .role(created.getRole())
-                .creditScore(created.getCreditScore())
-                .status(created.getStatus())
-                .build();
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(dto));
+        this.jwtTokenUtil = jwtTokenUtil;
+        this.jwtProperties = jwtProperties;
+        this.tokenBlacklistService = tokenBlacklistService;
+        this.userService = userService;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<UserDTO>> login(@Valid @RequestBody LoginRequest req) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
         try {
-            Authentication auth = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword())
-            );
-            // 认证成功：在此处可以生成 JWT 并返回给客户端。当前示例只返回基本用户信息
-            User u = userService.findByUsername(req.getUsername());
-            UserDTO dto = UserDTO.builder()
-                    .id(u.getId())
-                    .username(u.getUsername())
-                    .email(u.getEmail())
-                    .role(u.getRole())
-                    .creditScore(u.getCreditScore())
-                    .status(u.getStatus())
-                    .build();
-            return ResponseEntity.ok(ApiResponse.ok(dto));
-        } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("用户名或密码错误"));
-        } catch (LockedException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("账户被锁定"));
-        } catch (AuthenticationException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("认证失败"));
+            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
+            String token = jwtTokenUtil.generateToken(req.getUsername());
+            return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                    "token", jwtProperties.getTokenPrefix() + token,
+                    "expiresIn", jwtProperties.getExpirationSeconds()
+            )));
+        } catch (AuthenticationException ex) {
+            return ResponseEntity.status(401).body(ApiResponse.fail("用户名或密码错误"));
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader(name = "${jwt.header:Authorization}", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith(jwtProperties.getTokenPrefix())) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("缺少 token"));
+        }
+        String token = authHeader.substring(jwtProperties.getTokenPrefix().length());
+        Date exp = jwtTokenUtil.getExpirationDateFromToken(token);
+        long expiryMillis = exp != null ? exp.getTime() : (System.currentTimeMillis() + jwtProperties.getExpirationSeconds() * 1000);
+        tokenBlacklistService.blacklist(token, expiryMillis);
+        return ResponseEntity.ok(ApiResponse.ok("logout"));
     }
 }
