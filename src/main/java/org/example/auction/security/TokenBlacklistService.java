@@ -1,32 +1,16 @@
 package org.example.auction.security;
 
-import org.springframework.stereotype.Service;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
- * 简单内存黑名单：token -> expiryMillis
- * 开发/单实例环境可用；生产请改为 Redis 或集中存储。
+ * 黑名单接口：用于处理 access token 黑名单（登出/撤销 token）
  */
-@Service
-public class TokenBlacklistService {
+public interface TokenBlacklistService {
+    /**
+     * 将 token 加入黑名单，expiryMillis 为 token 的到期时间（毫秒）
+     */
+    void blacklist(String token, long expiryMillis);
 
-    private final Map<String, Long> blacklist = new ConcurrentHashMap<>();
-
-    public void blacklist(String token, long expiryMillis) {
-        if (token == null) return;
-        blacklist.put(token, expiryMillis);
-    }
-
-    public boolean isBlacklisted(String token) {
-        if (token == null) return false;
-        Long exp = blacklist.get(token);
-        if (exp == null) return false;
-        if (System.currentTimeMillis() > exp) {
-            blacklist.remove(token);
-            return false;
-        }
-        return true;
-    }
+    /**
+     * token 是否在黑名单中（若已过期会自动清理返回 false）
+     */
+    boolean isBlacklisted(String token);
 }

@@ -34,4 +34,6 @@ public class JwtProperties {
      */
     private String tokenPrefix = "Bearer ";
 
+    private long refreshExpirationDays = 30;
+
 }

@@ -1,6 +1,7 @@
 package org.example.auction.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl; // 需要导入
 import org.example.auction.dto.RegisterRequest;
 import org.example.auction.entity.User;
 import org.example.auction.mapper.UserMapper;
@@ -15,7 +16,7 @@ import java.time.LocalDateTime;
  * 简单的 UserService 实现（MyBatis-Plus）
  */
 @Service
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl extends ServiceImpl<UserMapper, User>implements UserService {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
@@ -35,7 +36,6 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public User register(RegisterRequest req) {
-        // 假定已在 Controller 做了参数校验与重复用户名检查
         User u = User.builder()
                 .username(req.getUsername())
                 .password(passwordEncoder.encode(req.getPassword()))
@@ -45,7 +45,12 @@ public class UserServiceImpl implements UserService {
                 .status("ACTIVE")
                 .createdAt(LocalDateTime.now())
                 .build();
-        userMapper.insert(u);
+        this.save(u);
         return u;
+    }
+
+    @Override
+    public User findById(Long id) {
+        return this.getById(id);
     }
 }
