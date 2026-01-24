@@ -9,23 +9,32 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * bids 表对应实体
+ * 订单
+ * 状态：PENDING_PAYMENT / PAID / CANCELLED / BREACH
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("bids")
-public class Bid {
+@TableName("orders")
+public class Order {
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     private Long itemId;
 
-    private Long userId;
+    private Long sellerId;
 
-    private BigDecimal amount;
+    private Long buyerId;
 
-    private LocalDateTime bid_time;
+    private BigDecimal finalPrice;
+
+    private String status;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime payBy; // 最晚支付时间（例如拍卖结束后24小时）
+
+    private String receiptPath; // HTML 凭证文件路径
 }

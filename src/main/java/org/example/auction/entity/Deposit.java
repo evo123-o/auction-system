@@ -9,14 +9,15 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * bids 表对应实体
+ * 保证金记录
+ * 状态：PENDING(待支付) / PAID(已支付可参与) / FROZEN(已冻结) / REFUNDED(已退款) / FORFEITED(已罚没)
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("bids")
-public class Bid {
+@TableName("deposits")
+public class Deposit {
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
@@ -27,5 +28,11 @@ public class Bid {
 
     private BigDecimal amount;
 
-    private LocalDateTime bid_time;
+    private String status;
+
+    private String paymentRef;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
 }

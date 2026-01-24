@@ -9,23 +9,29 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * bids 表对应实体
+ * 违约记录
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("bids")
-public class Bid {
+@TableName("breach_records")
+public class BreachRecord {
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    private Long itemId;
-
     private Long userId;
 
-    private BigDecimal amount;
+    private Long itemId;
 
-    private LocalDateTime bid_time;
+    private Long orderId;
+
+    private String reason;
+
+    private BigDecimal penaltyAmount;
+
+    private Integer creditScoreDelta;
+
+    private LocalDateTime createdAt;
 }

@@ -1,4 +1,4 @@
-package org.example.auction.utils;
+package org.example.auction.util;
 
 import org.example.auction.entity.User;
 import org.example.auction.service.UserService;

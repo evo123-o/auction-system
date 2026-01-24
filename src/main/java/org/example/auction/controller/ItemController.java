@@ -10,7 +10,7 @@ import org.example.auction.entity.Item;
 import org.example.auction.service.ItemService;
 import org.example.auction.service.UserService;
 import org.example.auction.storage.StorageService;
-import org.example.auction.utils.SecurityUtils;
+import org.example.auction.util.SecurityUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
