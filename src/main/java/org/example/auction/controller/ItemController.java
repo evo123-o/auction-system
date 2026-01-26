@@ -3,16 +3,17 @@ package org.example.auction.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
+import lombok.Getter;
 import org.example.auction.dto.CreateItemRequest;
 import org.example.auction.dto.ItemDTO;
 import org.example.auction.dto.PageResponse;
 import org.example.auction.entity.Item;
+import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.ItemService;
 import org.example.auction.service.UserService;
 import org.example.auction.storage.StorageService;
 import org.example.auction.util.SecurityUtils;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 
 /**
  * ItemController：带基于当前登录用户的权限校验、标准分页 DTO、图片上传通过 StorageService
+ * 已改为使用 CurrentUserService 以统一获取当前用户 id。
  */
 @RestController
 @RequestMapping("/api/items")
@@ -33,15 +35,15 @@ public class ItemController {
 
     private final ItemService itemService;
     private final StorageService storageService;
+    @Getter
     private final UserService userService;
+    private final CurrentUserService currentUserService;
 
-    @Value("${image.max-size-bytes:2097152}")
-    private long maxImageSize;
-
-    public ItemController(ItemService itemService, StorageService storageService, UserService userService) {
+    public ItemController(ItemService itemService, StorageService storageService, UserService userService, CurrentUserService currentUserService) {
         this.itemService = itemService;
         this.storageService = storageService;
         this.userService = userService;
+        this.currentUserService = currentUserService;
     }
 
     @GetMapping
@@ -76,7 +78,7 @@ public class ItemController {
 
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody CreateItemRequest req) {
-        Optional<Long> optId = SecurityUtils.getCurrentUserId(userService);
+        Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
         }
@@ -86,7 +88,7 @@ public class ItemController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody CreateItemRequest req) {
-        Optional<Long> optId = SecurityUtils.getCurrentUserId(userService);
+        Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
         }
@@ -102,7 +104,7 @@ public class ItemController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        Optional<Long> optId = SecurityUtils.getCurrentUserId(userService);
+        Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
 
         Item existing = itemService.getById(id);
@@ -119,7 +121,7 @@ public class ItemController {
 
     @PostMapping("/{id}/image")
     public ResponseEntity<?> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
-        Optional<Long> optId = SecurityUtils.getCurrentUserId(userService);
+        Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
 
         Item existing = itemService.getById(id);
@@ -129,17 +131,11 @@ public class ItemController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("没有权限为该拍品上传图片");
         }
 
-        // 前置校验：文件大小超过阈值直接返回 413（LocalStorageService 会尝试压缩，但这里预防过大的原始文件）
-        if (file.getSize() > maxImageSize * 5) { // 防止上传极大文件（5x maxSize）
-            return ResponseEntity.status(413).body(java.util.Map.of("error", "上传文件过大"));
-        }
-
         try {
-            String imageUrl = itemService.saveImage(id, file);
+            String folder = "items/" + id;
+            String imageUrl = storageService.store(file, folder);
             Item item = itemService.updateImagePath(id, imageUrl);
             return ResponseEntity.ok().body(java.util.Map.of("imageUrl", imageUrl, "item", toDto(item)));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(java.util.Map.of("error", ex.getMessage()));
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Map.of("error", ex.getMessage()));
         }
@@ -152,4 +148,5 @@ public class ItemController {
         dto.setImageUrl(item.getImagePath());
         return dto;
     }
+
 }

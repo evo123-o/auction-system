@@ -30,9 +30,6 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         String password = credentials == null ? "" : credentials.toString();
 
         UserDetails user = userDetailsService.loadUserByUsername(username);
-        if (user == null) {
-            throw new BadCredentialsException("用户名或密码错误");
-        }
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BadCredentialsException("用户名或密码错误");
         }

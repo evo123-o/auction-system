@@ -1,6 +1,5 @@
 package org.example.auction.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.example.auction.entity.Deposit;
 import org.example.auction.mapper.DepositMapper;
 import org.example.auction.service.DepositService;

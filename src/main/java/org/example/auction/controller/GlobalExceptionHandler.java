@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
     @ResponseBody
     public ResponseEntity<ApiResponse<String>> handleMethodNotSupported(HttpServletRequest req,
                                                                         HttpRequestMethodNotSupportedException ex) {
-        String msg = "不支持的请求方法: " + ex.getMethod() + ". 请使用 " + String.join(", ", ex.getSupportedMethods() != null ? ex.getSupportedMethods() : new String[]{}) + ".";
+        String msg = "不支持的请求方法: " + ex.getMethod() + ". 请使用 " + String.join(", ", ex.getSupportedMethods()) + ".";
         ApiResponse<String> body = ApiResponse.fail(msg);
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
     }

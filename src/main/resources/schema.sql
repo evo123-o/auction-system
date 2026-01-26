@@ -135,22 +135,6 @@ CREATE TABLE IF NOT EXISTS evaluations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE INDEX idx_evals_order ON evaluations(order_id);
-
--- violations: 违约记录与处罚
-CREATE TABLE IF NOT EXISTS violations (
-                                          id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                                          user_id BIGINT NOT NULL,
-                                          order_id BIGINT NULL,
-                                          reason VARCHAR(512),
-                                          penalty_amount DECIMAL(12,2) DEFAULT 0.00,
-                                          credit_delta INT DEFAULT 0,
-                                          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                          CONSTRAINT fk_violations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                                          CONSTRAINT fk_violations_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE INDEX idx_violations_user ON violations(user_id);
-
 -- breach_records: 额外的违约/处罚记录（如果需要）
 CREATE TABLE IF NOT EXISTS breach_records (
                                               id BIGINT AUTO_INCREMENT PRIMARY KEY,
