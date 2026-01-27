@@ -1,5 +1,6 @@
 package org.example.auction.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
 import org.example.auction.mapper.BidMapper;
@@ -7,83 +8,90 @@ import org.example.auction.mapper.ItemMapper;
 import org.example.auction.service.BidService;
 import org.example.auction.service.DepositService;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
-/**
- * Bid 服务实现：通过 SELECT ... FOR UPDATE 实现数据库级并发控制（行锁）。
- * 使用数据库进行并发控制。
- */
 @Service
 public class BidServiceImpl implements BidService {
 
-    private final ItemMapper itemMapper;
     private final BidMapper bidMapper;
+    private final ItemMapper itemMapper;
     private final DepositService depositService;
 
-    public BidServiceImpl(ItemMapper itemMapper, BidMapper bidMapper, DepositService depositService) {
-        this.itemMapper = itemMapper;
+    public BidServiceImpl(BidMapper bidMapper, ItemMapper itemMapper, DepositService depositService) {
         this.bidMapper = bidMapper;
+        this.itemMapper = itemMapper;
         this.depositService = depositService;
     }
-    /**
-     * 在事务中执行，隔离级别保持默认（或 READ_COMMITTED），并在事务内对 item 执行 FOR UPDATE 锁定。
-     * 注意：并发安全依赖于数据库的行锁（SELECT ... FOR UPDATE）和事务隔离。
-     */
+
     @Override
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(rollbackFor = Exception.class)
     public Bid placeBid(Long userId, Long itemId, BigDecimal amount) {
-        // 保证金校验
-        Item itemSnapshot = itemMapper.selectById(itemId);
-        java.math.BigDecimal required = itemSnapshot == null ? java.math.BigDecimal.ZERO : itemSnapshot.getDepositAmount();
-        if (!depositService.isEligibleForBidding(userId, itemId, required)) {
-            throw new IllegalArgumentException("deposit not paid or insufficient");
+        if (userId == null || itemId == null || amount == null) {
+            throw new IllegalArgumentException("参数不能为空");
         }
-        // 1. 锁定 item 所在行
-        Item item = itemMapper.selectByIdForUpdate(itemId);
-        if (item == null) {
-            throw new IllegalArgumentException("item not found: " + itemId);
+        if (amount.compareTo(BigDecimal.valueOf(0.01)) < 0) {
+            throw new IllegalArgumentException("出价金额必须大于 0");
         }
 
-        // 2. 业务规则校验
-        // 要求 item 处于 RUNNING 状态（根据业务领域进行调整）
+        Item item = itemMapper.selectById(itemId);
+        if (item == null) throw new IllegalArgumentException("拍品不存在");
+
+        // 基于时间窗口判断
+        LocalDateTime now = LocalDateTime.now();
+        if (item.getStartTime() != null && now.isBefore(item.getStartTime())) {
+            throw new IllegalArgumentException("auction has not started");
+        }
+        if (item.getEndTime() != null && now.isAfter(item.getEndTime())) {
+            throw new IllegalArgumentException("auction has ended");
+        }
+        // 若你必须要求 RUNNING 状态，可保留此断言；否则注释以允许时间驱动
         if (!"RUNNING".equalsIgnoreCase(item.getStatus())) {
             throw new IllegalArgumentException("item is not open for bidding");
         }
 
-        // 不能对自己发布的商品出价
-        if (item.getCreatedBy() != null && item.getCreatedBy().equals(userId)) {
-            throw new IllegalArgumentException("cannot bid on your own item");
+        // 保证金资格校验
+        BigDecimal required = item.getDepositAmount() == null ? BigDecimal.ZERO : item.getDepositAmount();
+        boolean eligible = depositService.isEligibleForBidding(userId, itemId, required);
+        if (!eligible) {
+            throw new IllegalArgumentException("未缴纳保证金或不满足出价条件");
         }
 
+        // 金额必须大于当前价（若当前价为空则取起拍价）
         BigDecimal current = item.getCurrentPrice() == null ? item.getStartPrice() : item.getCurrentPrice();
         if (current == null) current = BigDecimal.ZERO;
-
         if (amount.compareTo(current) <= 0) {
-            throw new IllegalArgumentException("bid must be greater than current price");
+            throw new IllegalArgumentException("出价必须高于当前价");
         }
 
-        // 3. 插入出价记录
-        Bid bid = Bid.builder()
-                .itemId(itemId)
-                .userId(userId)
-                .amount(amount)
-                .bid_time(LocalDateTime.now())
-                .build();
+        // 记录出价
+        Bid bid = new Bid();
+        bid.setItemId(itemId);
+        bid.setUserId(userId);
+        bid.setAmount(amount);
+        bid.setBid_time(LocalDateTime.now());
         bidMapper.insert(bid);
 
-        // 4. 更新 item 的当前价格
+        // 更新拍品当前价
         item.setCurrentPrice(amount);
-        item.setUpdatedAt(LocalDateTime.now());
         itemMapper.updateById(item);
 
-        // 5. 方法返回时事务提交
-        return bid;
+        // 可选：接近结束时间自动延长（若业务允许）
+        // if (item.getEndTime() != null && item.getMaxExtend() != null) { ... }
 
+        return bid;
     }
 
+    @Override
+    public List<Bid> listByItem(Long itemId) {
+        return bidMapper.selectList(
+                new LambdaQueryWrapper<Bid>()
+                        .eq(Bid::getItemId, itemId)
+                        .orderByDesc(Bid::getAmount)
+                        .orderByDesc(Bid::getBid_time)
+        );
+    }
 }
-

@@ -12,6 +12,7 @@ import java.io.IOException;
  * Item 服务接口
  */
 public interface ItemService {
+    Item startAuction(Long id);
 
     /**
      * 分页查询（支持简单的按 title/category/status ���滤）

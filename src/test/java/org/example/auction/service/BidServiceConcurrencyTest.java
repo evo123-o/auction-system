@@ -52,7 +52,7 @@ public class BidServiceConcurrencyTest {
         it.setExtendCount(0);
         it.setMaxExtend(3);
         // sample seller
-        Long sellerId = 100L;
+        Long sellerId = 1L;
         it.setCreatedBy(sellerId);
         it.setCreatedAt(LocalDateTime.now());
         itemMapper.insert(it);
@@ -81,7 +81,7 @@ public class BidServiceConcurrencyTest {
                 try {
                     return bidService.placeBid(bidderId, itemId, bidAmount);
                 } catch (Exception ex) {
-                    // for test we just return null on failure (e.g., bid too low)
+                    // for test, we just return null on failure (e.g., bid too low)
                     return null;
                 }
             };

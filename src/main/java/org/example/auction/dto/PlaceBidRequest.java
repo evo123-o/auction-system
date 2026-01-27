@@ -1,9 +1,9 @@
 package org.example.auction.dto;
 
 import lombok.Data;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
-
 import java.math.BigDecimal;
 
 /**

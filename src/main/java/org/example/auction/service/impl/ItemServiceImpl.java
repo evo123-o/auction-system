@@ -3,6 +3,7 @@ package org.example.auction.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.Getter;
 import org.example.auction.dto.CreateItemRequest;
 import org.example.auction.entity.Item;
 import org.example.auction.mapper.ItemMapper;
@@ -14,12 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.nio.file.Files;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 /**
  * ItemService 实现（整合 StorageService）
@@ -30,9 +27,11 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
     private final StorageService storageService;
 
+    @Getter
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    @Getter
     @Value("${app.upload.base-url:/uploads}")
     private String uploadBaseUrl;
 
@@ -43,17 +42,11 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public IPage<Item> pageItems(Page<Item> page, String title, String category, String status) {
-        LambdaQueryWrapper<Item> qw = new LambdaQueryWrapper<>();
-        if (title != null && !title.isBlank()) {
-            qw.like(Item::getTitle, title);
-        }
-        if (category != null && !category.isBlank()) {
-            qw.eq(Item::getCategory, category);
-        }
-        if (status != null && !status.isBlank()) {
-            qw.eq(Item::getStatus, status);
-        }
-        qw.orderByDesc(Item::getCreatedAt);
+        LambdaQueryWrapper<Item> qw = new LambdaQueryWrapper<Item>()
+                .like(title != null && !title.isBlank(), Item::getTitle, title)
+                .eq(category != null && !category.isBlank(), Item::getCategory, category)
+                .eq(status != null && !status.isBlank(), Item::getStatus, status)
+                .orderByDesc(Item::getCreatedAt);
         return itemMapper.selectPage(page, qw);
     }
 
@@ -63,40 +56,47 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    @Transactional
-    public Item create(CreateItemRequest req, Long createdBy) {
-        Item item = new Item();
-        BeanUtils.copyProperties(req, item);
-        if (item.getStartPrice() == null) item.setStartPrice(BigDecimal.ZERO);
-        if (item.getCurrentPrice() == null) item.setCurrentPrice(item.getStartPrice());
-        if (item.getDepositAmount() == null) item.setDepositAmount(BigDecimal.ZERO);
-        item.setStatus("PENDING");
-        item.setExtendCount(0);
-        item.setMaxExtend(3);
-        item.setCreatedBy(createdBy);
-        item.setCreatedAt(LocalDateTime.now());
-        itemMapper.insert(item);
+    @Transactional(rollbackFor = Exception.class)
+    public Item startAuction(Long id) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) throw new IllegalArgumentException("拍品不存在");
+        item.setStatus("RUNNING");
+        // 若开始时间在未来，调整为当前；生产环境可改为记录真实开拍时间
+        if (item.getStartTime() == null || item.getStartTime().isAfter(LocalDateTime.now())) {
+            item.setStartTime(LocalDateTime.now());
+        }
+        item.setUpdatedAt(LocalDateTime.now());
+        itemMapper.updateById(item);
         return item;
     }
 
     @Override
-    @Transactional
-    public Item update(Long id, CreateItemRequest req) {
-        Item existing = itemMapper.selectById(id);
-        if (existing == null) {
-            return null;
-        }
-        existing.setTitle(req.getTitle());
-        existing.setCategory(req.getCategory());
-        existing.setDescription(req.getDescription());
-        if (req.getStartPrice() != null) existing.setStartPrice(req.getStartPrice());
-        if (req.getDepositAmount() != null) existing.setDepositAmount(req.getDepositAmount());
-        existing.setStartTime(req.getStartTime());
-        existing.setEndTime(req.getEndTime());
-        existing.setUpdatedAt(LocalDateTime.now());
-        itemMapper.updateById(existing);
-        return existing;
+    @Transactional(rollbackFor = Exception.class)
+    public Item create(CreateItemRequest req, Long createdBy) {
+        Item item = new Item();
+        BeanUtils.copyProperties(req, item);
+        item.setCreatedBy(createdBy);
+        item.setCreatedAt(LocalDateTime.now());
+        // 默认状态可设为 PENDING
+        if (item.getStatus() == null) item.setStatus("PENDING");
+        itemMapper.insert(item);
+        // 初始当前价为起拍价
+        item.setCurrentPrice(item.getStartPrice());
+        itemMapper.updateById(item);
+        return item;
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Item update(Long id, CreateItemRequest req) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) throw new IllegalArgumentException("拍品不存在");
+        BeanUtils.copyProperties(req, item);
+        item.setUpdatedAt(LocalDateTime.now());
+        itemMapper.updateById(item);
+        return item;
+    }
+
 
     /**
      * 保存图片（通过 StorageService），并更新 item.imagePath
@@ -120,10 +120,10 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    @Transactional
-    public Item updateImagePath(Long itemId, String imageUrl) {
-        Item item = itemMapper.selectById(itemId);
-        if (item == null) return null;
+    @Transactional(rollbackFor = Exception.class)
+    public Item updateImagePath(Long id, String imageUrl) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) throw new IllegalArgumentException("拍品不存在");
         item.setImagePath(imageUrl);
         item.setUpdatedAt(LocalDateTime.now());
         itemMapper.updateById(item);
@@ -147,4 +147,5 @@ public class ItemServiceImpl implements ItemService {
         int rows = itemMapper.deleteById(id);
         return rows > 0;
     }
+
 }

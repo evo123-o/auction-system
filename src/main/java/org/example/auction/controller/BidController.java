@@ -1,10 +1,8 @@
 package org.example.auction.controller;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.validation.constraints.DecimalMin;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.PlaceBidRequest;
 import org.example.auction.entity.Bid;
@@ -14,12 +12,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * BidController：提供出价接口
+ * BidController：提供出价接口与出价历史
  * - POST /api/bids/place            body: { itemId, amount }
- * - POST /api/items/{id}/bid       body: { amount }  (兼容另一种常见设计)
+ * - POST /api/items/{id}/bid       body: { amount }  (兼容路由)
+ * - GET  /api/bids/history?itemId  查询某拍品出价历史
  */
 @RestController
 @RequestMapping("/api")
@@ -50,10 +51,6 @@ public class BidController {
         }
     }
 
-    /**
-     * 兼容路由：POST /api/items/{id}/bid
-     * body: { "amount": 123.45 }
-     */
     @PostMapping("/items/{id}/bid")
     public ResponseEntity<?> placeBidOnItem(@PathVariable("id") Long itemId, @Valid @RequestBody AmountOnly amt) {
         Optional<Long> optUser = currentUserService.getCurrentUserId();
@@ -71,13 +68,22 @@ public class BidController {
         }
     }
 
+    @GetMapping("/bids/history")
+    public ResponseEntity<?> history(@RequestParam("itemId") Long itemId) {
+        Optional<Long> optUser = currentUserService.getCurrentUserId();
+        if (optUser.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
+        // 一般允许任何登录用户查看某拍品的出价历史；如需仅限创建者或管理员可查，可加权限判断
+        List<Bid> list = bidService.listByItem(itemId);
+        return ResponseEntity.ok(ApiResponse.ok(list));
+    }
+
     // 内部简单 DTO 用于 /items/{id}/bid 路由
-    @Setter
-    @Getter
     public static class AmountOnly {
         @NotNull
         @DecimalMin("0.01")
-        private java.math.BigDecimal amount;
+        private BigDecimal amount;
 
+        public BigDecimal getAmount() { return amount; }
+        public void setAmount(BigDecimal amount) { this.amount = amount; }
     }
 }

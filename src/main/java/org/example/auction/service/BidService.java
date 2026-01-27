@@ -3,6 +3,7 @@ package org.example.auction.service;
 import org.example.auction.entity.Bid;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Bid 服务接口
@@ -23,4 +24,6 @@ public interface BidService {
      * @throws IllegalArgumentException 当违反业务规则时
      */
     Bid placeBid(Long userId, Long itemId, BigDecimal amount);
+    List<Bid> listByItem(Long itemId);
 }
+

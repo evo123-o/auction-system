@@ -5,7 +5,7 @@ import org.example.auction.entity.Item;
 import org.example.auction.entity.Order;
 
 public interface OrderService {
-
+    Order getById(Long id);
     /**
      * 根据中标信息生成订单（设置最晚支付时间，例如24小时）
      */

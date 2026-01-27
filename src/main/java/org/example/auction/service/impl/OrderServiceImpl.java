@@ -1,9 +1,11 @@
 package org.example.auction.service.impl;
 
+import lombok.Getter;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
 import org.example.auction.entity.Order;
 import org.example.auction.mapper.OrderMapper;
+import org.example.auction.service.DepositService;
 import org.example.auction.service.OrderService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ import java.time.LocalDateTime;
 public class OrderServiceImpl implements OrderService {
 
     private final OrderMapper orderMapper;
+    @Getter
+    private final DepositService depositService;
 
     @Value("${app.receipts.dir:receipts}")
     private String receiptsDir;
@@ -25,8 +29,15 @@ public class OrderServiceImpl implements OrderService {
     @Value("${app.pay.deadline-hours:24}")
     private int payDeadlineHours;
 
-    public OrderServiceImpl(OrderMapper orderMapper) {
+    public OrderServiceImpl(OrderMapper orderMapper, DepositService depositService) {
+        this.depositService = depositService;
         this.orderMapper = orderMapper;
+    }
+
+
+    @Override
+    public Order getById(Long id) {
+        return orderMapper.selectById(id);
     }
 
     @Override
@@ -46,13 +57,19 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
-    public Order markPaid(Long orderId) {
-        Order o = orderMapper.selectById(orderId);
-        if (o == null) throw new IllegalArgumentException("order not found: " + orderId);
-        o.setStatus("PAID");
-        orderMapper.updateById(o);
-        return o;
+    @Transactional(rollbackFor = Exception.class)
+    public Order markPaid(Long id) {
+        Order order = orderMapper.selectById(id);
+        if (order == null) {
+            throw new IllegalArgumentException("订单不存在");
+        }
+        // 仅当非 PAID 时更新
+        if (!"PAID".equalsIgnoreCase(order.getStatus())) {
+            order.setStatus("PAID");
+            order.setPayBy(LocalDateTime.now());
+            orderMapper.updateById(order);
+        }
+        return order;
     }
 
     @Override
@@ -81,4 +98,5 @@ public class OrderServiceImpl implements OrderService {
             return null;
         }
     }
+
 }
