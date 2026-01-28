@@ -20,6 +20,8 @@ const handleLogout = async () => {
           <router-link to="/" class="nav-link">首页</router-link>
           <template v-if="authStore.isAuthenticated">
             <router-link to="/items/create" class="nav-link">创建拍品</router-link>
+            <router-link to="/orders" class="nav-link">我的订单</router-link>
+            <router-link to="/deposits" class="nav-link">保证金</router-link>
             <router-link to="/dashboard" class="nav-link">我的</router-link>
             <button @click="handleLogout" class="nav-link logout-btn">退出</button>
           </template>

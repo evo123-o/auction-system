@@ -1,5 +1,6 @@
 package org.example.auction.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.example.auction.entity.Deposit;
 import org.example.auction.mapper.DepositMapper;
 import org.example.auction.service.DepositService;
@@ -8,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class DepositServiceImpl implements DepositService {
@@ -91,5 +93,26 @@ public class DepositServiceImpl implements DepositService {
         d.setStatus("FORFEITED");
         d.setUpdatedAt(LocalDateTime.now());
         depositMapper.updateById(d);
+    }
+
+    @Override
+    public List<Deposit> listByUser(Long userId) {
+        LambdaQueryWrapper<Deposit> qw = new LambdaQueryWrapper<Deposit>()
+                .eq(Deposit::getUserId, userId)
+                .orderByDesc(Deposit::getCreatedAt);
+        return depositMapper.selectList(qw);
+    }
+
+    @Override
+    public List<Deposit> listByItem(Long itemId) {
+        LambdaQueryWrapper<Deposit> qw = new LambdaQueryWrapper<Deposit>()
+                .eq(Deposit::getItemId, itemId)
+                .orderByDesc(Deposit::getCreatedAt);
+        return depositMapper.selectList(qw);
+    }
+
+    @Override
+    public Deposit getById(Long depositId) {
+        return depositMapper.selectById(depositId);
     }
 }
