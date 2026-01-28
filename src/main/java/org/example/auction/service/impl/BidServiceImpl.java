@@ -7,6 +7,7 @@ import org.example.auction.mapper.BidMapper;
 import org.example.auction.mapper.ItemMapper;
 import org.example.auction.service.BidService;
 import org.example.auction.service.DepositService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,15 @@ public class BidServiceImpl implements BidService {
     private final BidMapper bidMapper;
     private final ItemMapper itemMapper;
     private final DepositService depositService;
+
+    @Value("${app.auction.default-extend-minutes:5}")
+    private int extendMinutes;
+
+    @Value("${app.auction.max-extend-count:3}")
+    private int maxExtendCount;
+
+    @Value("${app.auction.extend-threshold-minutes:5}")
+    private int extendThresholdMinutes;
 
     public BidServiceImpl(BidMapper bidMapper, ItemMapper itemMapper, DepositService depositService) {
         this.bidMapper = bidMapper;
@@ -77,10 +87,23 @@ public class BidServiceImpl implements BidService {
 
         // 更新拍品当前价
         item.setCurrentPrice(amount);
-        itemMapper.updateById(item);
 
-        // 可选：接近结束时间自动延长（若业务允许）
-        // if (item.getEndTime() != null && item.getMaxExtend() != null) { ... }
+        // 自动延时逻辑：在竞拍结束前N分钟内有新出价时，自动延长竞拍时间
+        if (item.getEndTime() != null) {
+            LocalDateTime thresholdTime = item.getEndTime().minusMinutes(extendThresholdMinutes);
+            Integer currentExtendCount = item.getExtendCount() == null ? 0 : item.getExtendCount();
+            Integer maxExtend = item.getMaxExtend() == null ? maxExtendCount : item.getMaxExtend();
+
+            // 如果当前时间在结束时间前N分钟内，且还有延时次数
+            if (now.isAfter(thresholdTime) && currentExtendCount < maxExtend) {
+                // 延长结束时间
+                item.setEndTime(item.getEndTime().plusMinutes(extendMinutes));
+                item.setExtendCount(currentExtendCount + 1);
+            }
+        }
+
+        item.setUpdatedAt(LocalDateTime.now());
+        itemMapper.updateById(item);
 
         return bid;
     }

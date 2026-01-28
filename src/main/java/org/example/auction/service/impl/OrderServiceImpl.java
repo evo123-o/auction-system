@@ -1,5 +1,8 @@
 package org.example.auction.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.Getter;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
@@ -97,6 +100,62 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    @Override
+    public IPage<Order> pageByBuyer(Page<Order> page, Long buyerId, String status) {
+        LambdaQueryWrapper<Order> qw = new LambdaQueryWrapper<Order>()
+                .eq(Order::getBuyerId, buyerId)
+                .eq(status != null && !status.isBlank(), Order::getStatus, status)
+                .orderByDesc(Order::getCreatedAt);
+        return orderMapper.selectPage(page, qw);
+    }
+
+    @Override
+    public IPage<Order> pageBySeller(Page<Order> page, Long sellerId, String status) {
+        LambdaQueryWrapper<Order> qw = new LambdaQueryWrapper<Order>()
+                .eq(Order::getSellerId, sellerId)
+                .eq(status != null && !status.isBlank(), Order::getStatus, status)
+                .orderByDesc(Order::getCreatedAt);
+        return orderMapper.selectPage(page, qw);
+    }
+
+    @Override
+    public IPage<Order> pageAll(Page<Order> page, String status) {
+        LambdaQueryWrapper<Order> qw = new LambdaQueryWrapper<Order>()
+                .eq(status != null && !status.isBlank(), Order::getStatus, status)
+                .orderByDesc(Order::getCreatedAt);
+        return orderMapper.selectPage(page, qw);
+    }
+
+    @Override
+    @Transactional
+    public Order markShipped(Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new IllegalArgumentException("订单不存在");
+        }
+        if (!"PAID".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("订单状态不允许发货");
+        }
+        order.setStatus("SHIPPED");
+        orderMapper.updateById(order);
+        return order;
+    }
+
+    @Override
+    @Transactional
+    public Order markReceived(Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new IllegalArgumentException("订单不存在");
+        }
+        if (!"SHIPPED".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("订单状态不允许确认收货");
+        }
+        order.setStatus("RECEIVED");
+        orderMapper.updateById(order);
+        return order;
     }
 
 }
