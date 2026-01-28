@@ -1,0 +1,282 @@
+{
+  "info": {
+    "name": "Auction API - Full Flow",
+    "description": "Postman collection for end-to-end testing: auth (JWT + refresh), items, deposits, bidding, uploads, orders, breaches. Replace variables before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "username", "value": "alice" },
+    { "key": "password", "value": "password123" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "itemId", "value": "" },
+    { "key": "depositId", "value": "" },
+    { "key": "orderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth - Login (get access + refresh)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Auth - Refresh token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "refreshToken",
+              "value": "{{refreshToken}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/refresh",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "refresh"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Auth - Logout (revoke refresh + blacklist access)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout?refreshToken={{refreshToken}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "logout"],
+          "query": [{ "key": "refreshToken", "value": "{{refreshToken}}" }]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Items - Create Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Vintage Vase\",\n  \"category\": \"Antiques\",\n  \"description\": \"A lovely vase\",\n  \"startPrice\": 100.00,\n  \"depositAmount\": 10.00,\n  \"startTime\": \"2026-01-01T00:00:00\",\n  \"endTime\": \"2099-01-01T00:00:00\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/items",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "items"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Items - List (paged)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/items?page=1&size=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "items"],
+          "query": [
+            { "key": "page", "value": "1" },
+            { "key": "size", "value": "10" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Items - Get Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/items/{{itemId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "items", "{{itemId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Deposits - Init (create or update deposit record)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/deposits/init/{{itemId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "deposits", "init", "{{itemId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Deposits - Pay (simulate payment)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/deposits/pay/{{depositId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "deposits", "pay", "{{depositId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Deposits - Status (eligible for bidding)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/deposits/status?itemId={{itemId}}&userId={{username}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "deposits", "status"],
+          "query": [
+            { "key": "itemId", "value": "{{itemId}}" },
+            { "key": "userId", "value": "{{username}}" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Bids - Place Bid",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"itemId\": {{itemId}},\n  \"amount\": 150.00\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/bids/place",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "bids", "place"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Items - Upload Image (multipart/form-data)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/items/{{itemId}}/image",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "items", "{{itemId}}", "image"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Orders - Pay (simulate payment marking order PAID)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/pay/{{orderId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "orders", "pay", "{{orderId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Breaches - My Breach Records",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/breaches",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "breaches"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Admin - Delete Item (admin only)",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/items/{{itemId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "items", "{{itemId}}"]
+        }
+      },
+      "response": []
+    }
+  ]
+}
