@@ -59,6 +59,7 @@ public class SecurityConfig {
         JwtAuthenticationEntryPoint entryPoint = new JwtAuthenticationEntryPoint();
 
         http
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(entryPoint))
                 .authorizeHttpRequests(authorize -> authorize
