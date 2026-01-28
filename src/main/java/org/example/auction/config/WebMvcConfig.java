@@ -2,6 +2,7 @@ package org.example.auction.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -11,6 +12,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * app.upload.dir=uploads
  * app.upload.base-url=/uploads
  * 然后通过 <a href="http://localhost:8080/uploads/">...</a>{filename} 访问文件。
+ * 同时配置 CORS 以允许前端跨域访问。
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
@@ -27,5 +29,17 @@ public class WebMvcConfig implements WebMvcConfigurer {
         String location = "file:" + uploadDir + "/";
         String pattern = uploadBaseUrl + "/**";
         registry.addResourceHandler(pattern).addResourceLocations(location);
+    }
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        // CORS configuration for development
+        // TODO: In production, replace with actual frontend domain(s) and use environment variables
+        registry.addMapping("/**")
+                .allowedOrigins("http://localhost:3000", "http://127.0.0.1:3000")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true)
+                .maxAge(3600);
     }
 }
