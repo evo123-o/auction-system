@@ -13,11 +13,6 @@ const routes = [
     component: () => import('../views/Login.vue')
   },
   {
-    path: '/items/:id',
-    name: 'ItemDetail',
-    component: () => import('../views/ItemDetail.vue')
-  },
-  {
     path: '/items/create',
     name: 'CreateItem',
     component: () => import('../views/CreateItem.vue'),
@@ -28,6 +23,11 @@ const routes = [
     name: 'EditItem',
     component: () => import('../views/EditItem.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/items/:id',
+    name: 'ItemDetail',
+    component: () => import('../views/ItemDetail.vue')
   },
   {
     path: '/dashboard',
