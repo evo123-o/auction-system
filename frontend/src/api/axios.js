@@ -13,6 +13,7 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
     if (token) {
+      // Token already includes "Bearer " prefix from backend
       config.headers.Authorization = token;
     }
     return config;
