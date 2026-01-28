@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS deposits;
 DROP TABLE IF EXISTS bids;
 DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS users;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -28,6 +29,20 @@ CREATE TABLE IF NOT EXISTS users (
                                      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                      updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- refresh_tokens: JWT refresh token 存储
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+                                              id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                              user_id BIGINT NOT NULL,
+                                              token VARCHAR(512) NOT NULL UNIQUE,
+                                              expires_at DATETIME NOT NULL,
+                                              revoked BOOLEAN NOT NULL DEFAULT FALSE,
+                                              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                              CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_token ON refresh_tokens(token);
 
 -- items: 拍品信息
 CREATE TABLE IF NOT EXISTS items (
@@ -74,6 +89,7 @@ CREATE TABLE IF NOT EXISTS deposits (
                                         item_id BIGINT NULL,
                                         amount DECIMAL(12,2) NOT NULL,
                                         status VARCHAR(32) NOT NULL DEFAULT 'PAID', -- UNPAID / PAID / FROZEN / REFUNDED / FORFEITED
+                                        payment_ref VARCHAR(255),
                                         paid_at DATETIME,
                                         frozen_at DATETIME,
                                         refunded_at DATETIME,
