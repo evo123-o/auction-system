@@ -2,6 +2,7 @@ package org.example.auction.service.impl;
 
 import org.example.auction.entity.Item;
 import org.example.auction.service.ItemCacheService;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,16 @@ public class ItemCacheServiceImpl implements ItemCacheService {
     @Value("${app.cache.item-ttl-ms:300000}")
     private long cacheTtlMs;
 
+    /**
+     * 创建 Item 的防御性拷贝
+     */
+    private Item copyItem(Item source) {
+        if (source == null) return null;
+        Item copy = new Item();
+        BeanUtils.copyProperties(source, copy);
+        return copy;
+    }
+
     @Override
     public Item getCachedItem(Long itemId) {
         if (itemId == null) return null;
@@ -69,13 +80,15 @@ public class ItemCacheServiceImpl implements ItemCacheService {
         }
 
         hits.incrementAndGet();
-        return entry.getItem();
+        // 返回防御性拷贝，防止外部修改缓存数据
+        return copyItem(entry.getItem());
     }
 
     @Override
     public void cacheItem(Item item) {
         if (item == null || item.getId() == null) return;
-        cache.put(item.getId(), new CacheEntry(item, cacheTtlMs));
+        // 存储防御性拷贝，防止外部修改影响缓存
+        cache.put(item.getId(), new CacheEntry(copyItem(item), cacheTtlMs));
     }
 
     @Override
@@ -84,10 +97,11 @@ public class ItemCacheServiceImpl implements ItemCacheService {
 
         CacheEntry entry = cache.get(itemId);
         if (entry != null && !entry.isExpired()) {
-            Item item = entry.getItem();
-            item.setCurrentPrice(newPrice);
+            // 创建新的拷贝并更新价格，然后存入缓存
+            Item updatedItem = copyItem(entry.getItem());
+            updatedItem.setCurrentPrice(newPrice);
             // 重新放入以重置过期时间
-            cache.put(itemId, new CacheEntry(item, cacheTtlMs));
+            cache.put(itemId, new CacheEntry(updatedItem, cacheTtlMs));
         }
     }
 
@@ -110,7 +124,8 @@ public class ItemCacheServiceImpl implements ItemCacheService {
         List<Item> items = new ArrayList<>();
         for (Map.Entry<Long, CacheEntry> e : cache.entrySet()) {
             if (!e.getValue().isExpired()) {
-                items.add(e.getValue().getItem());
+                // 返回防御性拷贝
+                items.add(copyItem(e.getValue().getItem()));
             }
         }
         return items;
