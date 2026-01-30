@@ -1,56 +1,74 @@
 package org.example.auction.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl; // 需要导入
-import org.example.auction.dto.RegisterRequest;
 import org.example.auction.entity.User;
 import org.example.auction.mapper.UserMapper;
 import org.example.auction.service.UserService;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/**
- * 简单的 UserService 实现（MyBatis-Plus）
- */
 @Service
-public class UserServiceImpl extends ServiceImpl<UserMapper, User>implements UserService {
+public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
-    private final PasswordEncoder passwordEncoder;
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public UserServiceImpl(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserMapper userMapper) {
         this.userMapper = userMapper;
-        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public User findByUsername(String username) {
-        LambdaQueryWrapper<User> qw = new LambdaQueryWrapper<>();
-        qw.eq(User::getUsername, username).last("LIMIT 1");
-        return userMapper.selectOne(qw);
+        return userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
     }
 
     @Override
-    @Transactional
-    public User register(RegisterRequest req) {
-        User u = User.builder()
-                .username(req.getUsername())
-                .password(passwordEncoder.encode(req.getPassword()))
-                .email(req.getEmail())
-                .role("USER")
-                .creditScore(100)
-                .status("ACTIVE")
-                .createdAt(LocalDateTime.now())
-                .build();
-        this.save(u);
-        return u;
+    public User findByUsernameOrEmail(String usernameOrEmail) {
+        return userMapper.selectOne(new LambdaQueryWrapper<User>()
+                .eq(User::getUsername, usernameOrEmail)
+                .or()
+                .eq(User::getEmail, usernameOrEmail));
+    }
+
+    @Override
+    public boolean existsByUsername(String username) {
+        return userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUsername, username)) > 0;
+    }
+
+    @Override
+    public boolean existsByEmail(String email) {
+        return email != null && userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getEmail, email)) > 0;
     }
 
     @Override
     public User findById(Long id) {
-        return this.getById(id);
+        return userMapper.selectById(id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public User register(String username, String rawPassword, String email) {
+        if (existsByUsername(username)) throw new IllegalArgumentException("用户名已存在");
+        if (email != null && existsByEmail(email)) throw new IllegalArgumentException("邮箱已被使用");
+
+        User u = new User();
+        u.setUsername(username);
+        u.setPassword(encoder.encode(rawPassword));
+        u.setEmail(email);
+        u.setRole("USER");
+        u.setCreditScore(100);
+        u.setStatus("ACTIVE");
+        u.setCreatedAt(LocalDateTime.now());
+        userMapper.insert(u);
+        return u;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void update(User user) {
+        userMapper.updateById(user);
     }
 }

@@ -3,6 +3,8 @@ package org.example.auction.controller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.DecimalMin;
+import lombok.Getter;
+import lombok.Setter;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.PlaceBidRequest;
 import org.example.auction.entity.Bid;
@@ -78,12 +80,12 @@ public class BidController {
     }
 
     // 内部简单 DTO 用于 /items/{id}/bid 路由
+    @Setter
+    @Getter
     public static class AmountOnly {
         @NotNull
         @DecimalMin("0.01")
         private BigDecimal amount;
 
-        public BigDecimal getAmount() { return amount; }
-        public void setAmount(BigDecimal amount) { this.amount = amount; }
     }
 }

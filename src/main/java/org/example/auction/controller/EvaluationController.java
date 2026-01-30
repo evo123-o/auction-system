@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Evaluation;
 import org.example.auction.entity.Order;
@@ -137,6 +139,8 @@ public class EvaluationController {
     /**
      * 评价请求 DTO
      */
+    @Setter
+    @Getter
     public static class EvaluationRequest {
         @NotNull(message = "订单ID不能为空")
         private Long orderId;
@@ -148,11 +152,5 @@ public class EvaluationController {
 
         private String comment;
 
-        public Long getOrderId() { return orderId; }
-        public void setOrderId(Long orderId) { this.orderId = orderId; }
-        public Integer getRating() { return rating; }
-        public void setRating(Integer rating) { this.rating = rating; }
-        public String getComment() { return comment; }
-        public void setComment(String comment) { this.comment = comment; }
     }
 }

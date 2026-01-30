@@ -2,7 +2,8 @@ package org.example.auction.controller;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Logistics;
 import org.example.auction.entity.Order;
@@ -96,6 +97,8 @@ public class LogisticsController {
     /**
      * 物流信息请求 DTO
      */
+    @Setter
+    @Getter
     public static class LogisticsRequest {
         @NotBlank(message = "物流公司不能为空")
         private String company;
@@ -105,11 +108,5 @@ public class LogisticsController {
 
         private String notes;
 
-        public String getCompany() { return company; }
-        public void setCompany(String company) { this.company = company; }
-        public String getTrackingNo() { return trackingNo; }
-        public void setTrackingNo(String trackingNo) { this.trackingNo = trackingNo; }
-        public String getNotes() { return notes; }
-        public void setNotes(String notes) { this.notes = notes; }
     }
 }

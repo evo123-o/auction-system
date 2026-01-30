@@ -91,8 +91,8 @@ public class BidServiceImpl implements BidService {
         // 自动延时逻辑：在竞拍结束前N分钟内有新出价时，自动延长竞拍时间
         if (item.getEndTime() != null) {
             LocalDateTime thresholdTime = item.getEndTime().minusMinutes(extendThresholdMinutes);
-            Integer currentExtendCount = item.getExtendCount() == null ? 0 : item.getExtendCount();
-            Integer maxExtend = item.getMaxExtend() == null ? maxExtendCount : item.getMaxExtend();
+            int currentExtendCount = item.getExtendCount() == null ? 0 : item.getExtendCount();
+            int maxExtend = item.getMaxExtend() == null ? maxExtendCount : item.getMaxExtend();
 
             // 如果当前时间在结束时间前N分钟内，且还有延时次数
             if (now.isAfter(thresholdTime) && currentExtendCount < maxExtend) {

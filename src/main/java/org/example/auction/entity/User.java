@@ -4,38 +4,32 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-/**
- * users 表对应实体
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Setter
+@Getter
 @TableName("users")
 public class User {
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     private String username;
-
-    private String password; // 存储 BCrypt 哈希
-
+    private String password;
     private String email;
-
-    private String role; // ADMIN / USER
+    private String role;
 
     @TableField("credit_score")
     private Integer creditScore;
 
-    private String status; // ACTIVE / BANNED
+    private String status; // ACTIVE / DISABLED / LOCKED ...
 
     @TableField("created_at")
     private LocalDateTime createdAt;
 
     @TableField("updated_at")
     private LocalDateTime updatedAt;
+
 }

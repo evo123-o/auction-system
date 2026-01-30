@@ -1,6 +1,7 @@
 package org.example.auction.config;
 
 import org.example.auction.security.*;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -8,8 +9,8 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.config.Customizer;
@@ -18,21 +19,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import java.util.List;
 
-/**
- * Security 配置：显式创建 DaoAuthenticationProvider + ProviderManager（AuthenticationManager），
- * 并把 JwtAuthenticationFilter 加入过滤链（在 UsernamePasswordAuthenticationFilter 之前）。
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final UserDetailsService userDetailsService;
     private final JwtTokenUtil jwtTokenUtil;
     private final JwtProperties jwtProperties;
     private final TokenBlacklistService tokenBlacklistService;
+    private final UserDetailsService userDetailsService;
 
-    public SecurityConfig(UserDetailsService userDetailsService,
+    public SecurityConfig(@Qualifier("customUserDetailsService") UserDetailsService userDetailsService,
                           JwtTokenUtil jwtTokenUtil,
                           JwtProperties jwtProperties,
                           TokenBlacklistService tokenBlacklistService) {
@@ -42,35 +39,36 @@ public class SecurityConfig {
         this.tokenBlacklistService = tokenBlacklistService;
     }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+//    @Bean
+//    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
     @Bean
-    public AuthenticationManager authenticationManager(UserDetailsService uds, PasswordEncoder encoder) {
-        CustomAuthenticationProvider provider = new CustomAuthenticationProvider(uds, encoder);
+    public AuthenticationManager authenticationManager(PasswordEncoder encoder) {
+        CustomAuthenticationProvider provider = new CustomAuthenticationProvider(userDetailsService, encoder);
         return new ProviderManager(List.of(provider));
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtTokenUtil, userDetailsService, jwtProperties, tokenBlacklistService);
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   AuthenticationManager authenticationManager) throws Exception {
+        JwtAuthenticationFilter jwtFilter =
+                new JwtAuthenticationFilter(jwtTokenUtil, userDetailsService, jwtProperties, tokenBlacklistService);
         JwtAuthenticationEntryPoint entryPoint = new JwtAuthenticationEntryPoint();
 
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(entryPoint))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/", "/index.html", "/api/auth/**", "/actuator/**", "/error").permitAll()
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/", "/index.html", "/error").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/uploads/**", "/receipts/**", "/static/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                // 不使用 session（根据需要可以改）
-                .sessionManagement(s -> s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
-                .httpBasic(Customizer.withDefaults());
+                .authenticationManager(authenticationManager);
 
-        // 在 UsernamePasswordAuthenticationFilter 之前放入 JWT 过滤器
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
