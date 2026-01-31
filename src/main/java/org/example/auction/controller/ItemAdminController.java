@@ -1,5 +1,8 @@
 package org.example.auction.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Item;
 import org.example.auction.security.CurrentUserService;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/items")
+@Tag(name = "拍品管理", description = "拍品的增删改查、图片上传等接口")
 public class ItemAdminController {
 
     private final ItemService itemService;
@@ -27,8 +31,9 @@ public class ItemAdminController {
     /**
      * 将拍品状态置为 RUNNING（仅拍品创建者或管理员）
      */
+    @Operation(summary = "开始拍卖", description = "将拍品状态置为进行中，仅创建者或管理员可操作")
     @PostMapping("/{id}/start")
-    public ResponseEntity<?> start(@PathVariable Long id) {
+    public ResponseEntity<?> start(@Parameter(description = "拍品ID") @PathVariable Long id) {
         var optUser = currentUserService.getCurrentUserId();
         if (optUser.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
         Long userId = optUser.get();

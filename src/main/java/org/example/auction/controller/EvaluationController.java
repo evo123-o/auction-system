@@ -1,5 +1,8 @@
 package org.example.auction.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -25,6 +28,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/evaluations")
+@Tag(name = "评价管理", description = "订单评价的创建和查询接口")
 public class EvaluationController {
 
     private final EvaluationService evaluationService;
@@ -42,8 +46,9 @@ public class EvaluationController {
     /**
      * 获取订单的所有评价
      */
+    @Operation(summary = "获取订单评价", description = "获取指定订单的所有评价，仅买家、卖家或管理员可查看")
     @GetMapping("/order/{orderId}")
-    public ResponseEntity<?> getByOrder(@PathVariable Long orderId) {
+    public ResponseEntity<?> getByOrder(@Parameter(description = "订单ID") @PathVariable Long orderId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
@@ -69,6 +74,7 @@ public class EvaluationController {
     /**
      * 获取当前用户的所有评价
      */
+    @Operation(summary = "我的评价列表", description = "获取当前用户创建的所有评价")
     @GetMapping("/my")
     public ResponseEntity<?> getMyEvaluations() {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
@@ -83,6 +89,7 @@ public class EvaluationController {
     /**
      * 创建评价
      */
+    @Operation(summary = "创建评价", description = "对已完成的订单进行评价，仅交易双方可评价")
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody EvaluationRequest request) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
@@ -125,8 +132,9 @@ public class EvaluationController {
     /**
      * 检查是否已评价
      */
+    @Operation(summary = "检查是否已评价", description = "检查当前用户是否已对指定订单进行评价")
     @GetMapping("/check/{orderId}")
-    public ResponseEntity<?> checkReviewed(@PathVariable Long orderId) {
+    public ResponseEntity<?> checkReviewed(@Parameter(description = "订单ID") @PathVariable Long orderId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));

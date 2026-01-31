@@ -1,5 +1,7 @@
 package org.example.auction.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.BreachRecord;
 import org.example.auction.security.CurrentUserService;
@@ -15,6 +17,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/breaches")
+@Tag(name = "违约记录", description = "用户违约记录查询接口")
 public class BreachController {
 
     private final BreachService breachService;
@@ -25,6 +28,7 @@ public class BreachController {
         this.currentUserService = currentUserService;
     }
 
+    @Operation(summary = "我的违约记录", description = "获取当前用户的所有违约记录")
     @GetMapping
     public ResponseEntity<?> myBreaches() {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
