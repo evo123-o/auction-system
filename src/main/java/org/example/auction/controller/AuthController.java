@@ -1,5 +1,11 @@
 package org.example.auction.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.LoginRequest;
@@ -21,6 +27,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "认证管理", description = "用户登录、登出、Token 刷新等认证相关接口")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -44,6 +51,9 @@ public class AuthController {
         this.refreshTokenService = refreshTokenService;
     }
 
+    @Operation(summary = "用户登录", description = "使用用户名和密码进行登录，返回 accessToken 和 refreshToken")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "登录成功")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "用户名或密码错误")
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
         try {
@@ -62,9 +72,11 @@ public class AuthController {
         }
     }
 
+    @Operation(summary = "用户登出", description = "使当前 accessToken 失效，可选提供 refreshToken 同时撤销")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "登出成功")
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestHeader(name = "${jwt.header:Authorization}", required = false) String authHeader,
-                                    @RequestParam(name = "refreshToken", required = false) String refreshToken) {
+                                    @Parameter(description = "刷新令牌") @RequestParam(name = "refreshToken", required = false) String refreshToken) {
         // 撤销 refresh token（如果提供）
         if (refreshToken != null) {
             refreshTokenService.revokeRefreshToken(refreshToken);
@@ -80,8 +92,11 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("logged out"));
     }
 
+    @Operation(summary = "刷新令牌", description = "使用 refreshToken 获取新的 accessToken 和 refreshToken")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "刷新成功")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "refreshToken 无效或用户不存在")
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestParam("refreshToken") String refreshToken) {
+    public ResponseEntity<?> refresh(@Parameter(description = "刷新令牌") @RequestParam("refreshToken") String refreshToken) {
         try {
             RefreshToken newRt = refreshTokenService.rotateRefreshToken(refreshToken);
             RefreshToken dbRt = newRt;

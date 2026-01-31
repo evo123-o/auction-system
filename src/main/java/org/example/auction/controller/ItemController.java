@@ -2,6 +2,9 @@ package org.example.auction.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.Getter;
 import org.example.auction.dto.CreateItemRequest;
@@ -31,6 +34,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/items")
 @Validated
+@Tag(name = "拍品管理", description = "拍品的增删改查、图片上传等接口")
 public class ItemController {
 
     private final ItemService itemService;
@@ -46,13 +50,14 @@ public class ItemController {
         this.currentUserService = currentUserService;
     }
 
+    @Operation(summary = "分页查询拍品列表", description = "支持按标题、分类、状态筛选")
     @GetMapping
     public ResponseEntity<?> list(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String title,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) String status
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "标题关键字") @RequestParam(required = false) String title,
+            @Parameter(description = "分类") @RequestParam(required = false) String category,
+            @Parameter(description = "状态") @RequestParam(required = false) String status
     ) {
         Page<Item> pg = new Page<>(page, size);
         IPage<Item> results = itemService.pageItems(pg, title, category, status);
@@ -69,13 +74,15 @@ public class ItemController {
         return ResponseEntity.ok(resp);
     }
 
+    @Operation(summary = "获取拍品详情", description = "根据拍品ID获取详细信息")
     @GetMapping("/{id}")
-    public ResponseEntity<?> detail(@PathVariable Long id) {
+    public ResponseEntity<?> detail(@Parameter(description = "拍品ID") @PathVariable Long id) {
         Item item = itemService.getById(id);
         if (item == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("item not found");
         return ResponseEntity.ok(toDto(item));
     }
 
+    @Operation(summary = "创建拍品", description = "创建新的拍品，需要登录")
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody CreateItemRequest req) {
         Optional<Long> optId = currentUserService.getCurrentUserId();
@@ -86,8 +93,9 @@ public class ItemController {
         return ResponseEntity.status(HttpStatus.CREATED).body(toDto(created));
     }
 
+    @Operation(summary = "更新拍品", description = "更新拍品信息，仅创建者或管理员可操作")
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody CreateItemRequest req) {
+    public ResponseEntity<?> update(@Parameter(description = "拍品ID") @PathVariable Long id, @Valid @RequestBody CreateItemRequest req) {
         Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
@@ -102,8 +110,9 @@ public class ItemController {
         return ResponseEntity.ok(toDto(updated));
     }
 
+    @Operation(summary = "删除拍品", description = "删除拍品，仅创建者或管理员可操作")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable Long id) {
+    public ResponseEntity<?> delete(@Parameter(description = "拍品ID") @PathVariable Long id) {
         Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
 
@@ -119,8 +128,9 @@ public class ItemController {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("删除失败");
     }
 
+    @Operation(summary = "上传拍品图片", description = "为拍品上传图片，仅创建者或管理员可操作")
     @PostMapping("/{id}/image")
-    public ResponseEntity<?> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadImage(@Parameter(description = "拍品ID") @PathVariable Long id, @Parameter(description = "图片文件") @RequestParam("file") MultipartFile file) {
         Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
 
