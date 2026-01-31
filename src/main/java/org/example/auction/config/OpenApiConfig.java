@@ -38,6 +38,6 @@ public class OpenApiConfig {
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
                                         .bearerFormat("JWT")
-                                        .description("请输入 JWT token（不需要 Bearer 前缀）")));
+                                        .description("在 Authorization 请求头中输入 JWT token（系统会自动添加 Bearer 前缀）")));
     }
 }
