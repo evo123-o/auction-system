@@ -30,4 +30,6 @@ public class CreateItemRequest {
     private LocalDateTime startTime;
 
     private LocalDateTime endTime;
+
+    private boolean autoExtension;
 }

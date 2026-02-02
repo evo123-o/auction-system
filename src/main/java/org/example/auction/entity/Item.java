@@ -62,4 +62,8 @@ public class Item {
 
     @TableField("updated_at")
     private LocalDateTime updatedAt;
+
+    @TableField("auto_extension")
+    private Boolean autoExtension;
+
 }

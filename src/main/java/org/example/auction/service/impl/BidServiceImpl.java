@@ -53,14 +53,39 @@ public class BidServiceImpl implements BidService {
         // 基于时间窗口判断
         LocalDateTime now = LocalDateTime.now();
         if (item.getStartTime() != null && now.isBefore(item.getStartTime())) {
-            throw new IllegalArgumentException("auction has not started");
+            throw new IllegalArgumentException("拍卖尚未开始");
         }
         if (item.getEndTime() != null && now.isAfter(item.getEndTime())) {
-            throw new IllegalArgumentException("auction has ended");
+            throw new IllegalArgumentException("拍卖已结束");
         }
-        // 若你必须要求 RUNNING 状态，可保留此断言；否则注释以允许时间驱动
+
+        // 若状态校验不是必需的，可移除下行
         if (!"RUNNING".equalsIgnoreCase(item.getStatus())) {
-            throw new IllegalArgumentException("item is not open for bidding");
+            throw new IllegalArgumentException("商品未处于竞拍状态");
+        }
+
+        // --- 功能 1: 检查是否已经是最高出价者 ---
+        // 查询当前商品的最高出价记录 (LIMIT 1)
+        Bid highestBid = bidMapper.selectOne(new LambdaQueryWrapper<Bid>()
+                .eq(Bid::getItemId, itemId)
+                .orderByDesc(Bid::getAmount)
+                .last("LIMIT 1"));
+
+        if (highestBid != null) {
+            // 如果当前用户已经是最高出价者
+            if (highestBid.getUserId().equals(userId)) {
+                throw new IllegalArgumentException("您已经是当前最高出价者，无需重复出价！");
+            }
+            // 确保出价高于最高价
+            if (amount.compareTo(highestBid.getAmount()) <= 0) {
+                throw new IllegalArgumentException("出价必须高于当前最高价: " + highestBid.getAmount());
+            }
+        } else {
+            // 如果没有任何出价，检查是否高于起拍价
+            BigDecimal startPrice = item.getStartPrice() != null ? item.getStartPrice() : BigDecimal.ZERO;
+            if (amount.compareTo(startPrice) < 0) {
+                throw new IllegalArgumentException("出价不能低于起拍价: " + startPrice);
+            }
         }
 
         // 保证金资格校验
@@ -68,13 +93,6 @@ public class BidServiceImpl implements BidService {
         boolean eligible = depositService.isEligibleForBidding(userId, itemId, required);
         if (!eligible) {
             throw new IllegalArgumentException("未缴纳保证金或不满足出价条件");
-        }
-
-        // 金额必须大于当前价（若当前价为空则取起拍价）
-        BigDecimal current = item.getCurrentPrice() == null ? item.getStartPrice() : item.getCurrentPrice();
-        if (current == null) current = BigDecimal.ZERO;
-        if (amount.compareTo(current) <= 0) {
-            throw new IllegalArgumentException("出价必须高于当前价");
         }
 
         // 记录出价
@@ -88,8 +106,8 @@ public class BidServiceImpl implements BidService {
         // 更新拍品当前价
         item.setCurrentPrice(amount);
 
-        // 自动延时逻辑：在竞拍结束前N分钟内有新出价时，自动延长竞拍时间
-        if (item.getEndTime() != null) {
+        // 功能 2: 自动延时逻辑
+        if (Boolean.TRUE.equals(item.getAutoExtension()) && item.getEndTime() != null) {
             LocalDateTime thresholdTime = item.getEndTime().minusMinutes(extendThresholdMinutes);
             int currentExtendCount = item.getExtendCount() == null ? 0 : item.getExtendCount();
             int maxExtend = item.getMaxExtend() == null ? maxExtendCount : item.getMaxExtend();
