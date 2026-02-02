@@ -82,6 +82,7 @@ public class BidServiceConcurrencyTest {
                     return bidService.placeBid(bidderId, itemId, bidAmount);
                 } catch (Exception ex) {
                     // for test, we just return null on failure (e.g., bid too low)
+                    ex.printStackTrace(); // 打印异常堆栈以进行调试
                     return null;
                 }
             };

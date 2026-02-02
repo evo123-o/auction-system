@@ -65,10 +65,15 @@ public class DepositServiceImpl implements DepositService {
 
     @Override
     public boolean isEligibleForBidding(Long userId, Long itemId, BigDecimal requiredAmount) {
+        // 如果不需要保证金，直接通过
+        if (requiredAmount == null || requiredAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return true;
+        }
+
         Deposit d = depositMapper.findByItemAndUser(itemId, userId);
         if (d == null) return false;
         if (!"PAID".equals(d.getStatus())) return false;
-        return requiredAmount == null || d.getAmount() == null || d.getAmount().compareTo(requiredAmount) >= 0;
+        return d.getAmount() == null || d.getAmount().compareTo(requiredAmount) >= 0;
     }
 
     @Override

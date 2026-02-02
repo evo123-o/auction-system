@@ -3,6 +3,7 @@ package org.example.auction.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Null;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Item;
 import org.example.auction.security.CurrentUserService;
@@ -11,6 +12,10 @@ import org.example.auction.util.SecurityUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 额外的拍品管理接口（开拍）
@@ -47,5 +52,17 @@ public class ItemAdminController {
 
         Item updated = itemService.startAuction(id); // 需要在 ItemService 中实现：将 status=RUNNING、更新时间等
         return ResponseEntity.ok(ApiResponse.ok(updated));
+    }
+    @GetMapping("/api/users")
+    public ResponseEntity<List<Map<String, Object>>> listUsers() {
+        return ResponseEntity.ok(Collections.emptyList());
+    }
+    @GetMapping("/api/orders/admin/all")
+    public ResponseEntity<List<Map<String, Object>>> listAllOrders() {
+        return ResponseEntity.ok(Collections.emptyList());
+    }
+    @GetMapping("/api/bids")
+    public ResponseEntity<List<Map<String, Object>>> listBids( @RequestParam(value = "itemId", required = false) Long itemId, @RequestParam(value = "userId", required = false) Long userId ) {
+        return ResponseEntity.ok(Collections.emptyList());
     }
 }

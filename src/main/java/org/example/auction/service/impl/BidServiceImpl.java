@@ -47,7 +47,11 @@ public class BidServiceImpl implements BidService {
             throw new IllegalArgumentException("出价金额必须大于 0");
         }
 
-        Item item = itemMapper.selectById(itemId);
+        // 使用悲观锁 (FOR UPDATE) 获取 Item，防止并发导致的出价覆盖或价格不一致
+        Item item = itemMapper.selectOne(new LambdaQueryWrapper<Item>()
+                .eq(Item::getId, itemId)
+                .last("FOR UPDATE"));
+
         if (item == null) throw new IllegalArgumentException("拍品不存在");
 
         // 基于时间窗口判断
@@ -95,6 +99,7 @@ public class BidServiceImpl implements BidService {
             throw new IllegalArgumentException("未缴纳保证金或不满足出价条件");
         }
 
+        // ... existing code ...
         // 记录出价
         Bid bid = new Bid();
         bid.setItemId(itemId);
@@ -103,8 +108,11 @@ public class BidServiceImpl implements BidService {
         bid.setBid_time(LocalDateTime.now());
         bidMapper.insert(bid);
 
-        // 更新拍品当前价
-        item.setCurrentPrice(amount);
+        // 使用 LambdaUpdateWrapper 强制更新 Item，确保 SQL 一定执行
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Item> updateWrapper = new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        updateWrapper.eq(Item::getId, item.getId())
+                .set(Item::getCurrentPrice, amount)
+                .set(Item::getUpdatedAt, LocalDateTime.now());
 
         // 功能 2: 自动延时逻辑
         if (Boolean.TRUE.equals(item.getAutoExtension()) && item.getEndTime() != null) {
@@ -115,13 +123,12 @@ public class BidServiceImpl implements BidService {
             // 如果当前时间在结束时间前N分钟内，且还有延时次数
             if (now.isAfter(thresholdTime) && currentExtendCount < maxExtend) {
                 // 延长结束时间
-                item.setEndTime(item.getEndTime().plusMinutes(extendMinutes));
-                item.setExtendCount(currentExtendCount + 1);
+                updateWrapper.set(Item::getEndTime, item.getEndTime().plusMinutes(extendMinutes));
+                updateWrapper.set(Item::getExtendCount, currentExtendCount + 1);
             }
         }
 
-        item.setUpdatedAt(LocalDateTime.now());
-        itemMapper.updateById(item);
+        itemMapper.update(null, updateWrapper);
 
         return bid;
     }
