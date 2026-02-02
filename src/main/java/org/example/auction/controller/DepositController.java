@@ -1,5 +1,8 @@
 package org.example.auction.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Deposit;
@@ -23,6 +26,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/deposits")
+@Tag(name = "保证金管理", description = "保证金初始化、支付、状态查询等接口")
 public class DepositController {
 
     private final DepositService depositService;
@@ -38,8 +42,9 @@ public class DepositController {
     /**
      * 初始化保证金记录（准备缴纳）
      */
+    @Operation(summary = "初始化保证金", description = "为指定拍品初始化保证金记录")
     @PostMapping("/init/{itemId}")
-    public ResponseEntity<?> init(@PathVariable Long itemId) {
+    public ResponseEntity<?> init(@Parameter(description = "拍品ID") @PathVariable Long itemId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(401).body(ApiResponse.fail("未登录"));
         Long userId = optUserId.get();
@@ -54,8 +59,9 @@ public class DepositController {
     /**
      * 模拟支付保证金
      */
+    @Operation(summary = "支付保证金", description = "模拟支付保证金")
     @PostMapping("/pay/{depositId}")
-    public ResponseEntity<?> pay(@PathVariable Long depositId) {
+    public ResponseEntity<?> pay(@Parameter(description = "保证金ID") @PathVariable Long depositId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(401).body(ApiResponse.fail("未登录"));
 
@@ -75,8 +81,9 @@ public class DepositController {
     /**
      * 查询用户对某拍品的保证金状态
      */
+    @Operation(summary = "查询保证金状态", description = "查询当前用户对指定拍品的保证金是否满足竞拍条件")
     @GetMapping("/status")
-    public ResponseEntity<?> status(@RequestParam @NotNull Long itemId) {
+    public ResponseEntity<?> status(@Parameter(description = "拍品ID") @RequestParam @NotNull Long itemId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(401).body(ApiResponse.fail("未登录"));
         Long userId = optUserId.get();
@@ -90,6 +97,7 @@ public class DepositController {
     /**
      * 获取当前用户的所有保证金记录
      */
+    @Operation(summary = "我的保证金列表", description = "获取当前用户的所有保证金记录")
     @GetMapping("/my")
     public ResponseEntity<?> myDeposits() {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
@@ -102,8 +110,9 @@ public class DepositController {
     /**
      * 获取保证金详情
      */
+    @Operation(summary = "获取保证金详情", description = "根据保证金ID获取详情")
     @GetMapping("/{depositId}")
-    public ResponseEntity<?> getDeposit(@PathVariable Long depositId) {
+    public ResponseEntity<?> getDeposit(@Parameter(description = "保证金ID") @PathVariable Long depositId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(401).body(ApiResponse.fail("未登录"));
 

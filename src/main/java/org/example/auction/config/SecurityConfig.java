@@ -65,6 +65,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/uploads/**", "/receipts/**", "/static/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
+                        // OpenAPI/Swagger UI endpoints
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .authenticationManager(authenticationManager);

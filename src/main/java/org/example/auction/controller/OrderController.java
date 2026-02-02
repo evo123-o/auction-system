@@ -2,6 +2,9 @@ package org.example.auction.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.PageResponse;
 import org.example.auction.entity.Order;
@@ -19,6 +22,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/orders")
+@Tag(name = "订单管理", description = "订单查询、支付、发货、收货等接口")
 public class OrderController {
 
     private final OrderService orderService;
@@ -32,8 +36,9 @@ public class OrderController {
     /**
      * 获取订单详情
      */
+    @Operation(summary = "获取订单详情", description = "根据订单ID获取订单详情，仅买家、卖家或管理员可查看")
     @GetMapping("/{id}")
-    public ResponseEntity<?> get(@PathVariable Long id) {
+    public ResponseEntity<?> get(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
         Order order = orderService.getById(id);
@@ -50,11 +55,12 @@ public class OrderController {
     /**
      * 分页查询我的订单（作为买家）
      */
+    @Operation(summary = "查询我的订单（买家）", description = "分页查询当前用户作为买家的订单列表")
     @GetMapping("/my/buyer")
     public ResponseEntity<?> myBuyerOrders(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String status) {
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "订单状态") @RequestParam(required = false) String status) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
 
@@ -74,11 +80,12 @@ public class OrderController {
     /**
      * 分页查询我的订单（作为卖家）
      */
+    @Operation(summary = "查询我的订单（卖家）", description = "分页查询当前用户作为卖家的订单列表")
     @GetMapping("/my/seller")
     public ResponseEntity<?> mySellerOrders(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String status) {
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "订单状态") @RequestParam(required = false) String status) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
 
@@ -98,11 +105,12 @@ public class OrderController {
     /**
      * 管理员查询所有订单
      */
+    @Operation(summary = "查询所有订单（管理员）", description = "管理员分页查询所有订单列表")
     @GetMapping("/admin/all")
     public ResponseEntity<?> allOrders(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String status) {
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "订单状态") @RequestParam(required = false) String status) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
 
@@ -126,8 +134,9 @@ public class OrderController {
     /**
      * 模拟支付订单：置为 PAID，并在服务内部做解冻/扣款等逻辑
      */
+    @Operation(summary = "支付订单", description = "模拟支付订单，仅买家或管理员可操作")
     @PostMapping("/pay/{id}")
-    public ResponseEntity<?> pay(@PathVariable Long id) {
+    public ResponseEntity<?> pay(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
         Order order = orderService.getById(id);
@@ -142,8 +151,9 @@ public class OrderController {
     /**
      * 标记订单为已发货（卖家或管理员）
      */
+    @Operation(summary = "订单发货", description = "标记订单为已发货，仅卖家或管理员可操作")
     @PostMapping("/ship/{id}")
-    public ResponseEntity<?> ship(@PathVariable Long id) {
+    public ResponseEntity<?> ship(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
         Order order = orderService.getById(id);
@@ -162,8 +172,9 @@ public class OrderController {
     /**
      * 确认收货（买家）
      */
+    @Operation(summary = "确认收货", description = "买家确认收货，仅买家或管理员可操作")
     @PostMapping("/receive/{id}")
-    public ResponseEntity<?> receive(@PathVariable Long id) {
+    public ResponseEntity<?> receive(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
         Order order = orderService.getById(id);
@@ -182,8 +193,9 @@ public class OrderController {
     /**
      * 获取订单的 HTML 凭证
      */
+    @Operation(summary = "获取订单凭证", description = "获取订单的HTML凭证，仅买家、卖家或管理员可查看")
     @GetMapping("/{id}/receipt")
-    public ResponseEntity<?> getReceipt(@PathVariable Long id) {
+    public ResponseEntity<?> getReceipt(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
         Order order = orderService.getById(id);

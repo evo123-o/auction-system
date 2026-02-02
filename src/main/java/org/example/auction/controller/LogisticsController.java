@@ -1,5 +1,8 @@
 package org.example.auction.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -22,6 +25,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/logistics")
+@Tag(name = "物流管理", description = "物流信息查询与录入接口")
 public class LogisticsController {
 
     private final LogisticsService logisticsService;
@@ -39,8 +43,9 @@ public class LogisticsController {
     /**
      * 获取订单的物流信息
      */
+    @Operation(summary = "获取物流信息", description = "获取指定订单的物流信息，仅买家、卖家或管理员可查看")
     @GetMapping("/{orderId}")
-    public ResponseEntity<?> get(@PathVariable Long orderId) {
+    public ResponseEntity<?> get(@Parameter(description = "订单ID") @PathVariable Long orderId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
@@ -66,8 +71,9 @@ public class LogisticsController {
     /**
      * 创建或更新物流信息（仅管理员或卖家）
      */
+    @Operation(summary = "录入物流信息", description = "创建或更新物流信息，仅卖家或管理员可操作")
     @PostMapping("/{orderId}")
-    public ResponseEntity<?> saveOrUpdate(@PathVariable Long orderId,
+    public ResponseEntity<?> saveOrUpdate(@Parameter(description = "订单ID") @PathVariable Long orderId,
                                           @Valid @RequestBody LogisticsRequest request) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) {
