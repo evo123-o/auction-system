@@ -1,6 +1,7 @@
 package org.example.auction.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.NonNull;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
 import org.example.auction.mapper.BidMapper;
@@ -99,7 +100,6 @@ public class BidServiceImpl implements BidService {
             throw new IllegalArgumentException("未缴纳保证金或不满足出价条件");
         }
 
-        // ... existing code ...
         // 记录出价
         Bid bid = new Bid();
         bid.setItemId(itemId);
@@ -141,5 +141,49 @@ public class BidServiceImpl implements BidService {
                         .orderByDesc(Bid::getAmount)
                         .orderByDesc(Bid::getBid_time)
         );
+    }
+
+    @Override
+    public org.springframework.data.domain.Page<@NonNull Bid> pageAll(org.springframework.data.domain.Pageable pageable) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<Bid> mpPage =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageable.getPageNumber() + 1, pageable.getPageSize());
+
+        com.baomidou.mybatisplus.core.metadata.IPage<Bid> result = bidMapper.selectPage(mpPage,
+                new LambdaQueryWrapper<Bid>().orderByDesc(Bid::getBid_time));
+
+        return new org.springframework.data.domain.PageImpl<>(result.getRecords(), pageable, result.getTotal());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelBid(Long bidId) {
+        Bid bid = bidMapper.selectById(bidId);
+        if (bid == null) throw new IllegalArgumentException("出价记录不存在");
+
+        Long itemId = bid.getItemId();
+
+        // 删除记录
+        bidMapper.deleteById(bidId);
+
+        // 重新计算最高价
+        Bid highestFormat = bidMapper.selectOne(new LambdaQueryWrapper<Bid>()
+                .eq(Bid::getItemId, itemId)
+                .orderByDesc(Bid::getAmount)
+                .last("LIMIT 1"));
+
+        BigDecimal newPrice;
+        if (highestFormat != null) {
+            newPrice = highestFormat.getAmount();
+        } else {
+            // 没有出价了，恢复起拍价
+            Item item = itemMapper.selectById(itemId);
+            newPrice = item != null ? item.getStartPrice() : BigDecimal.ZERO;
+        }
+
+        // 更新 Item
+        Item updateItem = new Item();
+        updateItem.setId(itemId);
+        updateItem.setCurrentPrice(newPrice);
+        itemMapper.updateById(updateItem);
     }
 }

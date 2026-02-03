@@ -25,21 +25,13 @@ public class ItemCacheServiceImpl implements ItemCacheService {
     /**
      * 缓存条目包装类
      */
-    private static class CacheEntry {
-        private final Item item;
-        private final Instant expireAt;
-
+    private record CacheEntry(Item item, Instant expireAt) {
         CacheEntry(Item item, long ttlMillis) {
-            this.item = item;
-            this.expireAt = Instant.now().plusMillis(ttlMillis);
+            this(item, Instant.now().plusMillis(ttlMillis));
         }
 
         boolean isExpired() {
             return Instant.now().isAfter(expireAt);
-        }
-
-        Item getItem() {
-            return item;
         }
     }
 
@@ -81,7 +73,7 @@ public class ItemCacheServiceImpl implements ItemCacheService {
 
         hits.incrementAndGet();
         // 返回防御性拷贝，防止外部修改缓存数据
-        return copyItem(entry.getItem());
+        return copyItem(entry.item());
     }
 
     @Override
@@ -98,7 +90,7 @@ public class ItemCacheServiceImpl implements ItemCacheService {
         CacheEntry entry = cache.get(itemId);
         if (entry != null && !entry.isExpired()) {
             // 创建新的拷贝并更新价格，然后存入缓存
-            Item updatedItem = copyItem(entry.getItem());
+            Item updatedItem = copyItem(entry.item());
             updatedItem.setCurrentPrice(newPrice);
             // 重新放入以重置过期时间
             cache.put(itemId, new CacheEntry(updatedItem, cacheTtlMs));
@@ -125,7 +117,7 @@ public class ItemCacheServiceImpl implements ItemCacheService {
         for (Map.Entry<Long, CacheEntry> e : cache.entrySet()) {
             if (!e.getValue().isExpired()) {
                 // 返回防御性拷贝
-                items.add(copyItem(e.getValue().getItem()));
+                items.add(copyItem(e.getValue().item()));
             }
         }
         return items;

@@ -17,6 +17,7 @@ import org.example.auction.service.UserService;
 import org.example.auction.storage.StorageService;
 import org.example.auction.util.SecurityUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -36,6 +37,9 @@ import java.util.stream.Collectors;
 @Validated
 @Tag(name = "拍品管理", description = "拍品的增删改查、图片上传等接口")
 public class ItemController {
+
+    @Value("${image.max-size-bytes-controller:2097152}")
+    private long maxSizeBytesController;
 
     private final ItemService itemService;
     private final StorageService storageService;
@@ -131,6 +135,10 @@ public class ItemController {
     @Operation(summary = "上传拍品图片", description = "为拍品上传图片，仅创建者或管理员可操作")
     @PostMapping("/{id}/image")
     public ResponseEntity<?> uploadImage(@Parameter(description = "拍品ID") @PathVariable Long id, @Parameter(description = "图片文件") @RequestParam("file") MultipartFile file) {
+        if (file.getSize() > maxSizeBytesController) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(java.util.Map.of("error", "文件大小超过限制: " + maxSizeBytesController + " bytes"));
+        }
+
         Optional<Long> optId = currentUserService.getCurrentUserId();
         if (optId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("请先登录");
 

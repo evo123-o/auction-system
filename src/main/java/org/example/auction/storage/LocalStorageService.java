@@ -84,7 +84,13 @@ public class LocalStorageService implements StorageService {
         Files.deleteIfExists(file);
         Path parent = file.getParent();
         Path base = Paths.get(uploadDir).toAbsolutePath();
-        while (parent != null && !parent.equals(base) && Files.exists(parent) && Files.list(parent).findAny().isEmpty()) {
+
+        while (parent != null && !parent.equals(base) && Files.exists(parent)) {
+            try (java.util.stream.Stream<Path> stream = Files.list(parent)) {
+                if (stream.findAny().isPresent()) {
+                    break;
+                }
+            }
             Files.deleteIfExists(parent);
             parent = parent.getParent();
         }

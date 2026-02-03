@@ -1,14 +1,20 @@
 package org.example.auction.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import jakarta.validation.constraints.NotNull;
+import lombok.NonNull;
 import org.example.auction.entity.User;
 import org.example.auction.mapper.UserMapper;
 import org.example.auction.service.UserService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -70,5 +76,43 @@ public class UserServiceImpl implements UserService {
     @Transactional(rollbackFor = Exception.class)
     public void update(User user) {
         userMapper.updateById(user);
+    }
+
+    // ===== 新增实现：分页查询、保存与删除 =====
+    @NotNull
+    @Override
+    public Page<@NonNull User> findAll(@NonNull Pageable pageable) {
+        // 简单实现：查询全部并在内存中分页（适用于用户量不大的测试/管理场景）
+        List<User> all = userMapper.selectList(null);
+        int total = all.size();
+        int pageNumber = pageable.getPageNumber();
+        int pageSize = pageable.getPageSize();
+        int from = pageNumber * pageSize;
+        int to = Math.min(from + pageSize, total);
+        List<User> content = (from >= total || from < 0) ? List.of() : all.subList(from, to);
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public User saveUser(User user) {
+        if (user.getId() == null) {
+            if (user.getPassword() != null) {
+                user.setPassword(encoder.encode(user.getPassword()));
+            }
+            user.setCreatedAt(LocalDateTime.now());
+            userMapper.insert(user);
+            return user;
+        } else {
+            user.setUpdatedAt(LocalDateTime.now());
+            userMapper.updateById(user);
+            return userMapper.selectById(user.getId());
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteById(Long id) {
+        userMapper.deleteById(id);
     }
 }

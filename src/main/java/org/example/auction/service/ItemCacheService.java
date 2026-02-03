@@ -1,6 +1,5 @@
 package org.example.auction.service;
 
-import lombok.Getter;
 import org.example.auction.entity.Item;
 
 import java.math.BigDecimal;
@@ -50,18 +49,7 @@ public interface ItemCacheService {
     /**
      * 缓存统计信息
      */
-    @Getter
-    class CacheStats {
-        private final int size;
-        private final long hits;
-        private final long misses;
-
-        public CacheStats(int size, long hits, long misses) {
-            this.size = size;
-            this.hits = hits;
-            this.misses = misses;
-        }
-
+    record CacheStats(int size, long hits, long misses) {
         public double getHitRate() {
             long total = hits + misses;
             return total > 0 ? (double) hits / total : 0.0;

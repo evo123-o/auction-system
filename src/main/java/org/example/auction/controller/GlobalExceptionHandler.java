@@ -1,6 +1,7 @@
 package org.example.auction.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.NonNull;
 import org.example.auction.dto.ApiResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -18,8 +19,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<String>> handleMethodNotSupported(HttpServletRequest req,
-                                                                        HttpRequestMethodNotSupportedException ex) {
+    public ResponseEntity<@NonNull ApiResponse<String>> handleMethodNotSupported(HttpServletRequest req,
+                                                                                 HttpRequestMethodNotSupportedException ex) {
         String msg = "不支持的请求方法: " + ex.getMethod() + ". 请使用 " + String.join(", ", ex.getSupportedMethods()) + ".";
         ApiResponse<String> body = ApiResponse.fail(msg);
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
@@ -27,7 +28,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     @ResponseBody
-    public ResponseEntity<ApiResponse<String>> handleGenericException(HttpServletRequest req, Exception ex) {
+    public ResponseEntity<@NonNull ApiResponse<String>> handleGenericException(HttpServletRequest req, Exception ex) {
         // 对开发阶段可以返回消息；生产环境避免泄露内部细节
         ApiResponse<String> body = ApiResponse.fail("服务器内部错误: " + ex.getMessage());
         HttpHeaders headers = new HttpHeaders();

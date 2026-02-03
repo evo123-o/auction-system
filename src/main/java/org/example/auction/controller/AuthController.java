@@ -2,16 +2,19 @@ package org.example.auction.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.LoginRequest;
 import org.example.auction.entity.RefreshToken;
 import org.example.auction.entity.User;
 import org.example.auction.security.*;
+import org.example.auction.service.PasswordResetService;
 import org.example.auction.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,10 +27,11 @@ import java.util.Map;
 
 /**
  * AuthController：JWT + Refresh Token 示例
+ * 已合并注册与密码重置接口（原 AuthExtraController 的功能）
  */
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "认证管理", description = "用户登录、登出、Token 刷新等认证相关接口")
+@Tag(name = "认证管理", description = "用户登录、登出、注册、密码重置、Token 刷新等认证相关接口")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -36,19 +40,22 @@ public class AuthController {
     private final TokenBlacklistService tokenBlacklistService;
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
+    private final PasswordResetService passwordResetService; // 新增：密码重置服务
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtTokenUtil jwtTokenUtil,
                           JwtProperties jwtProperties,
                           TokenBlacklistService tokenBlacklistService,
                           UserService userService,
-                          RefreshTokenService refreshTokenService) {
+                          RefreshTokenService refreshTokenService,
+                          PasswordResetService passwordResetService) {
         this.authenticationManager = authenticationManager;
         this.jwtTokenUtil = jwtTokenUtil;
         this.jwtProperties = jwtProperties;
         this.tokenBlacklistService = tokenBlacklistService;
         this.userService = userService;
         this.refreshTokenService = refreshTokenService;
+        this.passwordResetService = passwordResetService;
     }
 
     @Operation(summary = "用户登录", description = "使用用户名和密码进行登录，返回 accessToken 和 refreshToken")
@@ -98,10 +105,7 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@Parameter(description = "刷新令牌") @RequestParam("refreshToken") String refreshToken) {
         try {
-            RefreshToken newRt = refreshTokenService.rotateRefreshToken(refreshToken);
-            RefreshToken dbRt = newRt;
-            // 生成新的 access token（需要用户名）
-            // 通过 dbRt.userId 找 username（用 userService）
+            RefreshToken dbRt = refreshTokenService.rotateRefreshToken(refreshToken);
             Long userId = dbRt.getUserId();
             String username = null;
             if (userId != null) {
@@ -121,4 +125,70 @@ public class AuthController {
             return ResponseEntity.status(400).body(ApiResponse.fail(ex.getMessage()));
         }
     }
+
+    // ===== 以下为原 AuthExtraController 的合并内容：注册、忘记密码、重置密码 =====
+
+    /**
+     * 用户注册接口
+     */
+    @Operation(summary = "用户注册", description = "注册新用户")
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterReq req) {
+        try {
+            User u = userService.register(req.getUsername(), req.getPassword(), req.getEmail());
+            return ResponseEntity.ok(ApiResponse.ok(u.getUsername())); // 返回成功响应，包含用户名
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(ex.getMessage())); // 返回错误响应
+        }
+    }
+
+    /**
+     * 发起密码重置（发送验证码）
+     */
+    @Operation(summary = "发起密码重置（发送验证码）", description = "根据用户名或邮箱发送验证码，避免泄露是否存在账号")
+    @PostMapping("/password/forgot")
+    public ResponseEntity<?> forgot(@Valid @RequestBody ForgotReq req) {
+        passwordResetService.initiateByUsernameOrEmail(req.getUsernameOrEmail());
+        // 始终返回成功消息以防止用户名枚举攻击
+        return ResponseEntity.ok(ApiResponse.ok("如果账号存在，将向其发送验证码"));
+    }
+
+    /**
+     * 使用验证码重置密码
+     */
+    @Operation(summary = "使用验证码重置密码", description = "使用验证码重置用户密码")
+    @PostMapping("/password/reset")
+    public ResponseEntity<?> reset(@Valid @RequestBody ResetReq req) {
+        try {
+            passwordResetService.resetWithCode(req.getUsername(), req.getCode(), req.getNewPassword());
+            return ResponseEntity.ok(ApiResponse.ok("密码已重置")); // 返回成功响应
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(ex.getMessage())); // 返回错误响应
+        }
+    }
+
+    // DTOs for register/forgot/reset
+    @Setter
+    @Getter
+    public static class RegisterReq {
+        @NotBlank @Size(min = 3, max = 32) private String username; // 用户名必须在3到32个字符之间
+        @NotBlank @Size(min = 6, max = 64) private String password; // 密码必须在6到64个字符之间
+        @Email private String email; // 邮箱必须是有效的
+    }
+
+    @Setter
+    @Getter
+    public static class ForgotReq {
+        @NotBlank private String usernameOrEmail; // 用户名或邮箱不能为空
+    }
+
+    @Setter
+    @Getter
+    public static class ResetReq {
+        @NotBlank private String username; // 用户名不能为空
+        @NotBlank @Size(min = 6, max = 6) private String code; // 验证码必须是6个字符
+        @NotBlank @Size(min = 6, max = 64) private String newPassword; // 新密码必须在6到64个字符之间
+    }
+
 }
+

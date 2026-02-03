@@ -39,8 +39,7 @@ public class SecurityConfig {
         this.tokenBlacklistService = tokenBlacklistService;
     }
 
-//    @Bean
-//    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+
 
     @Bean
     public AuthenticationManager authenticationManager(PasswordEncoder encoder) {
