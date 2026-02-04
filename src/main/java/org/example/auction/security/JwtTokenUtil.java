@@ -11,7 +11,7 @@ import java.util.function.Function;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 简单的 JWT 工具：签发/解析/验证
+ * JWT 工具：签发/解析/验证
  */
 @Component
 public class JwtTokenUtil {
