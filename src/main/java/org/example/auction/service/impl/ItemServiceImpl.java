@@ -60,12 +60,29 @@ public class ItemServiceImpl implements ItemService {
     public Item startAuction(Long id) {
         Item item = itemMapper.selectById(id);
         if (item == null) throw new IllegalArgumentException("拍品不存在");
+
+        LocalDateTime now = LocalDateTime.now();
         item.setStatus("RUNNING");
-        // 若开始时间在未来，调整为当前；生产环境可改为记录真实开拍时间
-        if (item.getStartTime() == null || item.getStartTime().isAfter(LocalDateTime.now())) {
-            item.setStartTime(LocalDateTime.now());
+        item.setUpdatedAt(now);
+
+        // 先计算原定持续时长（用于在需要延长结束时间时参考）
+        long durationSeconds = 3600; // 默认 1 小时
+        if (item.getStartTime() != null && item.getEndTime() != null) {
+            long diff = java.time.Duration.between(item.getStartTime(), item.getEndTime()).getSeconds();
+            if (diff > 0) {
+                durationSeconds = diff;
+            }
         }
-        item.setUpdatedAt(LocalDateTime.now());
+
+        // 如果开始时间在未来，或者我们要重新开启一个已结束的拍卖，
+        // 将开始时间设为当前时间是合理的。
+        item.setStartTime(now);
+
+        // 如果结束时间已经过期（早于当前），则必须延长，否则会被定时任务立即关闭
+        if (item.getEndTime() == null || item.getEndTime().isBefore(now)) {
+            item.setEndTime(now.plusSeconds(durationSeconds));
+        }
+
         itemMapper.updateById(item);
         return item;
     }
