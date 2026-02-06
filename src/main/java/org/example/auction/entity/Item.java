@@ -43,7 +43,7 @@ public class Item {
     @TableField("end_time")
     private LocalDateTime endTime;
 
-    private String status; // PENDING / ON_SHELF / RUNNING / SOLD / CLOSED
+    private String status; // PENDING / ON_SHELF / RUNNING / SOLD / CLOSED / REJECTED
 
     @TableField("extend_count")
     private Integer extendCount;

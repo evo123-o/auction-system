@@ -48,4 +48,13 @@ public interface ItemService {
      * 删除拍品（同时尝试删除关联的图片文件，视 StorageService 能力而定）
      */
     boolean deleteById(Long id);
+
+    /**
+     * 审核拍品
+     * @param id 拍品ID
+     * @param approved 是否通过
+     * @param reason 拒绝理由（可选）
+     * @return 更新后的拍品
+     */
+    Item audit(Long id, boolean approved, String reason);
 }

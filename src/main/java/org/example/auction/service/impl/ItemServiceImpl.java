@@ -108,8 +108,15 @@ public class ItemServiceImpl implements ItemService {
     public Item update(Long id, CreateItemRequest req) {
         Item item = itemMapper.selectById(id);
         if (item == null) throw new IllegalArgumentException("拍品不存在");
+
         BeanUtils.copyProperties(req, item);
         item.setUpdatedAt(LocalDateTime.now());
+
+        // 如果之前被拒绝，用户修改后重新变为待审核
+        if ("REJECTED".equalsIgnoreCase(item.getStatus())) {
+            item.setStatus("PENDING");
+        }
+
         itemMapper.updateById(item);
         return item;
     }
@@ -163,6 +170,32 @@ public class ItemServiceImpl implements ItemService {
         }
         int rows = itemMapper.deleteById(id);
         return rows > 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Item audit(Long id, boolean approved, String reason) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) {
+            throw new IllegalArgumentException("拍品不存在");
+        }
+        // 仅 PENDING 状态可审核，或者 REJECTED 状态也可以重新审核通过?
+        // 通常只审核 PENDING。
+        if (!"PENDING".equalsIgnoreCase(item.getStatus())) {
+             // 允许管理员把 REJECTED 改回 ON_SHELF? 或者是 ON_SHELF 改回 REJECTED?
+             // 这里做严格限制：只有 PENDING 可以操作。
+            throw new IllegalStateException("当前状态不支持审核: " + item.getStatus());
+        }
+
+        if (approved) {
+            item.setStatus("ON_SHELF");
+        } else {
+            item.setStatus("REJECTED");
+            // TODO: 如果需要保存 reason，需要修改数据库添加 reason 字段
+        }
+        item.setUpdatedAt(LocalDateTime.now());
+        itemMapper.updateById(item);
+        return item;
     }
 
 }

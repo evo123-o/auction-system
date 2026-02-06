@@ -36,7 +36,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // CORS configuration for development
         // TODO: In production, replace with actual frontend domain(s) and use environment variables
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:3000", "http://127.0.0.1:3000")
+                .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true)

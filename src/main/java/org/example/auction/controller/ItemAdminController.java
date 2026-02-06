@@ -3,7 +3,6 @@ package org.example.auction.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.Null;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Item;
 import org.example.auction.security.CurrentUserService;
@@ -13,9 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 /**
  * 额外的拍品管理接口（开拍）
@@ -53,5 +49,32 @@ public class ItemAdminController {
         Item updated = itemService.startAuction(id); // 需要在 ItemService 中实现：将 status=RUNNING、更新时间等
         return ResponseEntity.ok(ApiResponse.ok(updated));
     }
+
+    /**
+     * 审核拍品（通过/拒绝）
+     */
+    @Operation(summary = "审核拍品", description = "管理员审核拍品，通过后状态变为 ON_SHELF，拒绝后变为 REJECTED")
+    @PostMapping("/{id}/audit")
+    public ResponseEntity<?> audit(
+            @Parameter(description = "拍品ID") @PathVariable Long id,
+            @RequestBody AuditRequest request) {
+
+        // 鉴权：必须是 ADMIN
+        if (!SecurityUtils.hasRole("ADMIN")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("无权操作"));
+        }
+
+        try {
+            Item updated = itemService.audit(id, request.approved, request.reason);
+            return ResponseEntity.ok(ApiResponse.ok(updated));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    // 内部类 DTO
+    public record AuditRequest(boolean approved, String reason) {}
 
 }
