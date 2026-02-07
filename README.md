@@ -39,6 +39,41 @@ auction-system/
 └── pom.xml                # Maven 配置
 ```
 
+## 系统整体架构
+
+前端独立部署，通过 HTTP/HTTPS 调用后端 API，实现前后端分离。
+
+```mermaid
+flowchart LR
+  subgraph Frontend[前端 (Vue 3)]
+    UI[浏览器/客户端]
+  end
+
+  subgraph Backend[后端 API (Spring Boot)]
+    API[REST API]
+    Auth[安全认证/JWT]
+    Service[业务服务]
+  end
+
+  subgraph DataLayer[数据层]
+    MySQL[(MySQL)]
+    Redis[(Redis 缓存/Token 黑名单)]
+  end
+
+  subgraph ThirdParty[第三方服务]
+    Mail[邮件服务/SMTP]
+    Storage[文件存储(本地/对象存储)]
+  end
+
+  UI -- HTTP/HTTPS --> API
+  API --> Auth
+  API --> Service
+  Service --> MySQL
+  Service --> Redis
+  Service --> Mail
+  Service --> Storage
+```
+
 ## 快速开始
 
 ### 1. 环境要求
