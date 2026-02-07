@@ -54,6 +54,9 @@ public class Item {
     @TableField("image_path")
     private String imagePath;
 
+    @TableField("reject_reason")
+    private String rejectReason; // 审核拒绝原因
+
     @TableField("created_by")
     private Long createdBy;
 

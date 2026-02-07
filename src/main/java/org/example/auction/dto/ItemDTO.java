@@ -28,4 +28,6 @@ public class ItemDTO {
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    // 新增：后端返回拍品被驳回时的原因（仅管理员/必要情况下返回）
+    private String rejectReason;
 }

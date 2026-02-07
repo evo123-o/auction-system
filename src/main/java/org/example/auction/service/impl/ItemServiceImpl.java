@@ -61,6 +61,14 @@ public class ItemServiceImpl implements ItemService {
         Item item = itemMapper.selectById(id);
         if (item == null) throw new IllegalArgumentException("拍品不存在");
 
+        // 增加安全检查：只有 "ON_SHELF" (已上架) 或 "CLOSED" (流拍/结束需重启) 的商品可以开启拍卖
+        // 未审核通过(PENDING/REJECTED)的商品不能直接开拍
+        String currentStatus = item.getStatus();
+        if (!"ON_SHELF".equalsIgnoreCase(currentStatus) && !"CLOSED".equalsIgnoreCase(currentStatus)) {
+
+            throw new IllegalStateException("商品状态为 [" + currentStatus + "]，无法开启拍卖，请先通过审核上架。");
+        }
+
         LocalDateTime now = LocalDateTime.now();
         item.setStatus("RUNNING");
         item.setUpdatedAt(now);
@@ -159,6 +167,12 @@ public class ItemServiceImpl implements ItemService {
     public boolean deleteById(Long id) {
         Item item = itemMapper.selectById(id);
         if (item == null) return false;
+
+        // 增加保护：正在拍卖或已售出的商品未必允许直接物理删除
+        if ("RUNNING".equalsIgnoreCase(item.getStatus())) {
+            throw new IllegalStateException("正在拍卖中的商品无法删除");
+        }
+
         // 尝试删除关联文件（如果 StorageService 支持）
         String imagePath = item.getImagePath();
         try {
@@ -179,19 +193,25 @@ public class ItemServiceImpl implements ItemService {
         if (item == null) {
             throw new IllegalArgumentException("拍品不存在");
         }
-        // 仅 PENDING 状态可审核，或者 REJECTED 状态也可以重新审核通过?
-        // 通常只审核 PENDING。
-        if (!"PENDING".equalsIgnoreCase(item.getStatus())) {
-             // 允许管理员把 REJECTED 改回 ON_SHELF? 或者是 ON_SHELF 改回 REJECTED?
-             // 这里做严格限制：只有 PENDING 可以操作。
-            throw new IllegalStateException("当前状态不支持审核: " + item.getStatus());
+
+        // 审核逻辑：允许对非终态商品进行干预
+        // 1. PENDING (待审核) -> 可通过/可驳回
+        // 2. REJECTED (已驳回) -> 可重新通过 (纠正错误)
+        // 3. ON_SHELF (已上架) -> 可强制驳回 (违规下架)
+        String s = item.getStatus();
+        if ("RUNNING".equalsIgnoreCase(s) || "SOLD".equalsIgnoreCase(s) || "CLOSED".equalsIgnoreCase(s)) {
+            // 已经进入交易流程或结束的，不允许通过简单的审核接口修改状态
+            throw new IllegalStateException("当前状态 [" + s + "] 不再支持审核操作");
         }
 
         if (approved) {
             item.setStatus("ON_SHELF");
+            // 如之前有被拒绝的原因，批准时应清空
+            item.setRejectReason(null);
         } else {
             item.setStatus("REJECTED");
-            // TODO: 如果需要保存 reason，需要修改数据库添加 reason 字段
+            // 保存拒绝原因（便于后续展示与审计）
+            item.setRejectReason(reason == null ? null : reason.trim());
         }
         item.setUpdatedAt(LocalDateTime.now());
         itemMapper.updateById(item);

@@ -164,6 +164,8 @@ public class ItemController {
         ItemDTO dto = ItemDTO.builder().build();
         BeanUtils.copyProperties(item, dto);
         dto.setImageUrl(item.getImagePath());
+        // 映射审核拒绝原因（若存在）
+        dto.setRejectReason(item.getRejectReason());
         return dto;
     }
 
