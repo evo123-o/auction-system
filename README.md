@@ -56,13 +56,13 @@ flowchart LR
   end
 
   subgraph DataLayer[数据层]
-    MySQL[(MySQL)]
+    MySQL[(MySQL 数据库)]
     Redis[(Redis 缓存/Token 黑名单)]
   end
 
   subgraph ThirdParty[第三方服务]
     Mail[邮件服务/SMTP]
-    Storage[文件存储(本地/对象存储)]
+    Storage[文件存储 (本地/对象存储)]
   end
 
   UI -- HTTP/HTTPS --> API
