@@ -78,6 +78,10 @@ flowchart LR
 
 详细功能模块图见 [SYSTEM_FUNCTION_MODULE_DIAGRAM.md](SYSTEM_FUNCTION_MODULE_DIAGRAM.md)。
 
+## 实体关系图
+
+详细实体关系图见 [ENTITY_RELATIONSHIP_DIAGRAM.md](ENTITY_RELATIONSHIP_DIAGRAM.md)。
+
 ## 快速开始
 
 ### 1. 环境要求
