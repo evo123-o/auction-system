@@ -32,8 +32,8 @@
 
 已集成 OpenAPI，启动服务后可访问：
 
-* `/swagger-ui/index.html` - 交互式文档
-* `/v3/api-docs` - JSON 规范文档
+* `/swagger-ui/index.html` - 交互式文档（根路径，不在 `/api` 前缀下）
+* `/v3/api-docs` - JSON 规范文档（根路径，不在 `/api` 前缀下）
 
 ## 1. 认证管理 (Authentication)
 
@@ -385,4 +385,3 @@
   * Token 黑名单支持 Redis 存储，登出后可撤销访问权限
   * 使用 Bean Validation（`@Valid`）进行输入校验，避免非法参数
   * 已配置 CORS 便于前端调用，生产环境应限制可信域名
-
