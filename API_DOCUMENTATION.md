@@ -30,7 +30,7 @@
 
 ### 0.3 Swagger/OpenAPI 文档
 
-已集成 OpenAPI，启动服务后可通过根路径访问以下端点（注意：这些路径不使用 `/api` 前缀）：
+已集成 OpenAPI，启动服务后可通过以下根路径访问端点（注意：这些路径不使用 `/api` 前缀）：
 
 * `/swagger-ui/index.html` - 交互式文档
 * `/v3/api-docs` - JSON 规范文档
@@ -378,7 +378,8 @@
 * **授权控制**: Spring Security 统一拦截除 `/api/auth/**`、Swagger、静态资源外的请求；管理员接口需 `ADMIN` 角色；拍品/订单等资源在服务层校验所有者或管理员权限。
 * **数据加密**:
   * 密码使用 BCrypt 哈希存储（`PasswordEncoder`）
-  * JWT 使用 HS256 签名密钥，防止被篡改；请通过 `jwt.secret` 配置强随机密钥并定期轮换（轮换会使现有 token 失效，建议在维护窗口或在 `JwtTokenUtil` 中支持旧/新密钥并行校验实现过渡）
+  * JWT 使用 HS256 签名密钥，防止被篡改；请通过 `jwt.secret` 配置强随机密钥
+  * 密钥轮换会使现有 token 失效，建议在维护窗口进行，或在 `JwtTokenUtil` 中支持旧/新密钥并行校验实现过渡
   * 生产环境建议通过 HTTPS 传输，保护令牌与敏感数据
 * **接口安全**:
   * 无状态认证（`SessionCreationPolicy.STATELESS`），CSRF 在 JWT 场景下禁用
