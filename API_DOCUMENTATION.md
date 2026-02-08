@@ -30,7 +30,7 @@
 
 ### 0.3 Swagger/OpenAPI 文档
 
-已集成 OpenAPI，启动服务后可访问（根路径，不在 `/api` 前缀下）：
+已集成 OpenAPI，启动服务后可通过根路径访问以下端点（注意：这些路径不使用 `/api` 前缀）：
 
 * `/swagger-ui/index.html` - 交互式文档
 * `/v3/api-docs` - JSON 规范文档
@@ -378,10 +378,10 @@
 * **授权控制**: Spring Security 统一拦截除 `/api/auth/**`、Swagger、静态资源外的请求；管理员接口需 `ADMIN` 角色；拍品/订单等资源在服务层校验所有者或管理员权限。
 * **数据加密**:
   * 密码使用 BCrypt 哈希存储（`PasswordEncoder`）
-  * JWT 使用 HS256 签名密钥，防止被篡改；请通过 `jwt.secret` 配置强随机密钥并定期轮换
+  * JWT 使用 HS256 签名密钥，防止被篡改；请通过 `jwt.secret` 配置强随机密钥并定期轮换（轮换会使现有 token 失效，建议在维护窗口或采用双密钥过渡）
   * 生产环境建议通过 HTTPS 传输，保护令牌与敏感数据
 * **接口安全**:
   * 无状态认证（`SessionCreationPolicy.STATELESS`），CSRF 在 JWT 场景下禁用
   * Token 黑名单支持 Redis 存储，登出后可撤销访问权限
   * 使用 Bean Validation（`@Valid`）进行输入校验，避免非法参数
-  * CORS 当前允许所有来源（仅适用于开发环境），生产部署前需在 `WebMvcConfig#addCorsMappings` 中限制可信域名（如替换为 `allowedOriginPatterns("https://example.com")`）
+  * CORS 当前配置为 `allowedOriginPatterns("*")`（仅适用于开发环境），生产部署前需在 `WebMvcConfig#addCorsMappings` 中限制可信域名（建议使用 `allowedOrigins("https://example.com")` 或明确的域名列表）
