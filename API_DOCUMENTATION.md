@@ -378,10 +378,10 @@
 * **授权控制**: Spring Security 统一拦截除 `/api/auth/**`、Swagger、静态资源外的请求；管理员接口需 `ADMIN` 角色；拍品/订单等资源在服务层校验所有者或管理员权限。
 * **数据加密**:
   * 密码使用 BCrypt 哈希存储（`PasswordEncoder`）
-  * JWT 使用 HS256 签名密钥，防止被篡改
+  * JWT 使用 HS256 签名密钥，防止被篡改；请通过 `jwt.secret` 配置强随机密钥并定期轮换
   * 生产环境建议通过 HTTPS 传输，保护令牌与敏感数据
 * **接口安全**:
   * 无状态认证（`SessionCreationPolicy.STATELESS`），CSRF 在 JWT 场景下禁用
   * Token 黑名单支持 Redis 存储，登出后可撤销访问权限
   * 使用 Bean Validation（`@Valid`）进行输入校验，避免非法参数
-  * CORS 当前允许所有来源（仅适用于开发环境），生产部署前务必限制为可信域名
+  * CORS 当前允许所有来源（仅适用于开发环境），生产部署前需在 `WebMvcConfig#addCorsMappings` 中限制可信域名（如替换为 `allowedOriginPatterns("https://example.com")`）
