@@ -27,6 +27,8 @@ public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
     authenticationManager.authenticate(
         new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
     String accessToken = jwtTokenUtil.generateToken(req.getUsername());
+    User u = userService.findByUsername(req.getUsername());
+    Long userId = u != null ? u.getId() : null;
     RefreshToken rt = refreshTokenService.createRefreshToken(userId);
     return ResponseEntity.ok(ApiResponse.ok(Map.of(
         "accessToken", jwtProperties.getTokenPrefix() + accessToken,
