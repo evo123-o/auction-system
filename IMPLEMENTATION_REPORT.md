@@ -1,0 +1,180 @@
+# 拍卖系统实现说明
+
+> 本文用于回答“开发环境与工具、核心功能模块实现、关键技术难点”等说明要求，内容基于当前仓库实现。
+
+## 1. 开发环境与工具
+
+- **IDE**：IntelliJ IDEA（后端开发）、VS Code（前端/文档编辑）
+- **数据库与缓存工具**：MySQL Workbench / DataGrip（数据库管理）、RedisInsight（Redis 可视化）
+- **接口调试**：Swagger UI（后端已集成）、Postman / Apifox
+- **构建与依赖管理**：Maven（Spring Boot）、Node.js + npm（前端构建）
+- **版本控制**：Git + GitHub（PR/Issue 工作流）
+
+## 2. 核心功能模块实现
+
+### 2.1 用户模块实现（注册、登录、权限校验）
+
+- **注册逻辑**：`AuthController#register` 调用 `UserServiceImpl#register`，先校验用户名/邮箱唯一性，再使用 BCrypt 加密密码并写入数据库。
+- **登录逻辑**：`AuthController#login` 使用 Spring Security 的 `AuthenticationManager` 完成认证，生成 JWT + Refresh Token。
+- **权限校验**：`SecurityConfig` 统一配置 JWT 过滤器与开放/受保护的 API 路径，实现对接口的访问控制。
+
+代码示例（注册/登录）：
+
+```java
+// src/main/java/org/example/auction/controller/AuthController.java
+@PostMapping("/login")
+public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
+    authenticationManager.authenticate(
+        new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
+    String accessToken = jwtTokenUtil.generateToken(req.getUsername());
+    RefreshToken rt = refreshTokenService.createRefreshToken(userId);
+    return ResponseEntity.ok(ApiResponse.ok(Map.of(
+        "accessToken", jwtProperties.getTokenPrefix() + accessToken,
+        "refreshToken", rt.getToken())));
+}
+
+@PostMapping("/register")
+public ResponseEntity<?> register(@Valid @RequestBody RegisterReq req) {
+    User u = userService.register(req.getUsername(), req.getPassword(), req.getEmail());
+    return ResponseEntity.ok(ApiResponse.ok(u.getUsername()));
+}
+```
+
+```java
+// src/main/java/org/example/auction/service/impl/UserServiceImpl.java
+public User register(String username, String rawPassword, String email) {
+    if (existsByUsername(username)) throw new IllegalArgumentException("用户名已存在");
+    if (email != null && existsByEmail(email)) throw new IllegalArgumentException("邮箱已被使用");
+    User u = new User();
+    u.setPassword(encoder.encode(rawPassword));
+    u.setRole("USER");
+    userMapper.insert(u);
+    return u;
+}
+```
+
+### 2.2 拍品模块实现（发布、查询、状态更新）
+
+- **发布/更新**：`ItemController#create` 与 `ItemServiceImpl#create` 负责创建拍品并初始化状态；更新时支持审核逻辑与状态重置。
+- **查询**：`ItemController#list` 支持分页与条件筛选，`detail` 获取单个拍品详情。
+- **状态更新**：`ItemStatusScheduler` 定时将已到开始/结束时间的拍品状态更新为 `RUNNING/CLOSED`。
+
+代码示例（创建与状态更新）：
+
+```java
+// src/main/java/org/example/auction/service/impl/ItemServiceImpl.java
+public Item create(CreateItemRequest req, Long createdBy) {
+    Item item = new Item();
+    BeanUtils.copyProperties(req, item);
+    item.setCreatedBy(createdBy);
+    item.setStatus("PENDING");
+    itemMapper.insert(item);
+    item.setCurrentPrice(item.getStartPrice());
+    itemMapper.updateById(item);
+    return item;
+}
+```
+
+```java
+// src/main/java/org/example/auction/schedule/ItemStatusScheduler.java
+@Scheduled(fixedDelay = 30_000)
+public void flipStatuses() {
+    itemMapper.update(null, new LambdaUpdateWrapper<Item>()
+        .ne(Item::getStatus, "RUNNING")
+        .le(Item::getStartTime, now)
+        .gt(Item::getEndTime, now)
+        .set(Item::getStatus, "RUNNING"));
+}
+```
+
+### 2.3 竞拍模块实现（出价逻辑、时间控制、价格更新）
+
+- **出价逻辑**：`BidServiceImpl#placeBid` 使用 `FOR UPDATE` 对拍品行加锁，防止并发写入冲突。
+- **时间控制**：检查拍卖开始/结束时间，并支持自动延时策略（结束前 N 分钟内出价自动延长）。
+- **价格更新**：出价成功后更新拍品 `current_price`，确保展示的最新价格一致。
+
+代码示例（核心出价逻辑）：
+
+```java
+// src/main/java/org/example/auction/service/impl/BidServiceImpl.java
+Item item = itemMapper.selectOne(new LambdaQueryWrapper<Item>()
+    .eq(Item::getId, itemId)
+    .last("FOR UPDATE"));
+
+if (amount.compareTo(highestBid.getAmount()) <= 0) {
+    throw new IllegalArgumentException("出价必须高于当前最高价");
+}
+
+bidMapper.insert(bid);
+itemMapper.update(null, updateWrapper
+    .set(Item::getCurrentPrice, amount)
+    .set(Item::getUpdatedAt, LocalDateTime.now()));
+```
+
+### 2.4 订单与支付模块实现（订单创建、状态流转、支付回调处理）
+
+- **订单创建**：`EndAuctionScheduler` 扫描结束的拍卖并选出最高出价者，调用 `OrderServiceImpl#createOrderFromWinningBid` 创建订单。
+- **状态流转**：`OrderServiceImpl` 提供 `markPaid / markShipped / markReceived` 等状态变更方法；`OrderController` 对权限进行校验。
+- **支付回调处理**：当前实现为“模拟支付”接口（`/api/orders/pay/{id}`）；真实支付可在此处对接回调并保持幂等处理。
+
+代码示例（订单创建与支付状态变更）：
+
+```java
+// src/main/java/org/example/auction/service/impl/OrderServiceImpl.java
+public Order createOrderFromWinningBid(Item item, Bid winnerBid) {
+    Order order = Order.builder()
+        .itemId(item.getId())
+        .buyerId(winnerBid.getUserId())
+        .status("PENDING_PAYMENT")
+        .payBy(LocalDateTime.now().plusHours(payDeadlineHours))
+        .build();
+    orderMapper.insert(order);
+    return order;
+}
+
+public Order markPaid(Long id) {
+    Order order = orderMapper.selectById(id);
+    if (!"PAID".equalsIgnoreCase(order.getStatus())) {
+        order.setStatus("PAID");
+        orderMapper.updateById(order);
+    }
+    return order;
+}
+```
+
+### 2.5 前端页面实现（主要页面效果图与交互）
+
+> 当前仓库仅包含后端实现，以下为与 API 对应的前端页面交互设计示意（可用于前端实现或答辩说明）。
+
+- **首页**：展示推荐拍品与公告信息，调用 `GET /api/items` 获取拍品列表。
+- **拍品列表**：支持分类/状态筛选与分页，调用 `GET /api/items` 携带查询参数。
+- **拍品详情页**：展示拍品信息与出价历史，调用 `GET /api/items/{id}` 与 `GET /api/bids/history`。
+- **个人中心**：展示我的拍品、我的订单，调用 `GET /api/orders/my/buyer`、`GET /api/orders/my/seller` 等接口。
+- **后台管理**：管理员审核拍品/管理订单/管理用户，调用 `ItemAdminController`、`AdminUserController` 等接口。
+
+效果图（线框示意）：
+
+| 页面 | 说明 |
+| --- | --- |
+| 首页 | ![首页](docs/screenshots/home.svg) |
+| 拍品列表 | ![拍品列表](docs/screenshots/items-list.svg) |
+| 拍品详情 | ![拍品详情](docs/screenshots/item-detail.svg) |
+| 个人中心 | ![个人中心](docs/screenshots/profile.svg) |
+| 后台管理 | ![后台管理](docs/screenshots/admin.svg) |
+
+## 3. 关键技术难点与解决方案
+
+1. **高并发竞拍数据一致性**
+   - 难点：多用户同时出价会导致“最高价覆盖”或“脏写”。
+   - 解决方案：在 `BidServiceImpl#placeBid` 中使用 `FOR UPDATE` 对拍品记录加锁，并在事务内完成出价与价格更新，保证一致性。
+
+2. **支付异步通知与幂等处理**
+   - 难点：第三方支付回调可能重复触发，导致订单状态异常。
+   - 解决方案：`OrderServiceImpl#markPaid` 先判断当前状态，确保状态变更幂等；可在此基础上扩展真实支付回调逻辑。
+
+3. **拍卖结束与定时任务**
+   - 难点：需要自动结束拍卖、生成订单、处理保证金与违约。
+   - 解决方案：
+     - `ItemStatusScheduler` 周期性更新拍品状态。
+     - `EndAuctionScheduler` 扫描已结束拍品并创建订单、退款/冻结保证金、通知用户。
+     - `OverdueOrderScheduler` 处理未按时支付的订单并执行违约逻辑。
