@@ -4,6 +4,37 @@
 
 **API 基础路径**: `/api`
 
+## 0. 接口设计说明
+
+### 0.1 统一响应格式
+
+后端接口统一返回 `ApiResponse<T>` 结构：
+
+```json
+{
+  "success": true,
+  "message": "ok",
+  "data": {}
+}
+```
+
+* `success`: 是否成功
+* `message`: 结果描述（失败时返回错误原因）
+* `data`: 业务数据（失败时通常为 `null`）
+
+### 0.2 通用请求约定
+
+* JSON 请求需设置 `Content-Type: application/json`
+* 受保护接口需携带 `Authorization: Bearer <accessToken>`
+* 文件上传使用 `multipart/form-data`
+
+### 0.3 Swagger/OpenAPI 文档
+
+已集成 OpenAPI，启动服务后可访问：
+
+* `/swagger-ui/index.html` - 交互式文档
+* `/v3/api-docs` - JSON 规范文档
+
 ## 1. 认证管理 (Authentication)
 
 ### 1.1 用户登录
@@ -20,8 +51,8 @@
 *   **Response (Success)**:
     ```json
     {
-      "code": 200,
-      "message": "success",
+      "success": true,
+      "message": "ok",
       "data": {
         "accessToken": "Bearer eyJhbGciOiJIUzI1NiJ9...",
         "expiresIn": 3600,
@@ -45,8 +76,8 @@
 *   **Response**:
     ```json
     {
-      "code": 200,
-      "message": "success",
+      "success": true,
+      "message": "ok",
       "data": "new user"
     }
     ```
@@ -60,8 +91,8 @@
 *   **Response**:
     ```json
     {
-      "code": 200,
-      "message": "success",
+      "success": true,
+      "message": "ok",
       "data": {
         "accessToken": "Bearer new-token...",
         "expiresIn": 3600,
@@ -117,7 +148,8 @@
 *   **Response**:
     ```json
     {
-      "code": 200,
+      "success": true,
+      "message": "ok",
       "data": {
         "records": [ { "id": 1, "title": "...", "currentPrice": 100.0, "..."} ],
         "total": 50,
@@ -340,4 +372,17 @@
 *   **List Bids (GET)**: `/api/admin/bids?page=1&size=20`
 *   **Cancel Bid (DELETE)**: `/api/admin/bids/{id}`
 
+## 10. 安全设计 (Security Design)
+
+* **用户认证**: 使用 JWT 作为 Access Token，通过 `Authorization: Bearer <token>` 传递；Refresh Token 用于换取新的 Access Token。
+* **授权控制**: Spring Security 统一拦截除 `/api/auth/**`、Swagger、静态资源外的请求；管理员接口需 `ADMIN` 角色；拍品/订单等资源在服务层校验所有者或管理员权限。
+* **数据加密**:
+  * 密码使用 BCrypt 哈希存储（`PasswordEncoder`）
+  * JWT 使用 HS256 签名密钥，防止被篡改
+  * 生产环境建议通过 HTTPS 传输，保护令牌与敏感数据
+* **接口安全**:
+  * 无状态认证（`SessionCreationPolicy.STATELESS`），CSRF 在 JWT 场景下禁用
+  * Token 黑名单支持 Redis 存储，登出后可撤销访问权限
+  * 使用 Bean Validation（`@Valid`）进行输入校验，避免非法参数
+  * 已配置 CORS 便于前端调用，生产环境应限制可信域名
 
