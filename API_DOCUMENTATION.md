@@ -384,4 +384,4 @@
   * 无状态认证（`SessionCreationPolicy.STATELESS`），CSRF 在 JWT 场景下禁用
   * Token 黑名单支持 Redis 存储，登出后可撤销访问权限
   * 使用 Bean Validation（`@Valid`）进行输入校验，避免非法参数
-  * CORS 当前允许所有来源（开发友好），生产环境应限制可信域名
+  * CORS 当前允许所有来源（仅适用于开发环境），生产部署前务必限制为可信域名
