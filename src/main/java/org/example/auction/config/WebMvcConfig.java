@@ -33,8 +33,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        // CORS configuration for development
-        // TODO: In production, replace with actual frontend domain(s) and use environment variables
+        // CORS configuration for development (do not use wildcard origins in production)
+        // TODO: Replace allowedOriginPatterns("*") with trusted frontend domain(s) before production deployment
         registry.addMapping("/**")
                 .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
