@@ -16,3 +16,4 @@ public class UserDTO {
     private Integer creditScore;
     private String status;
 }
+

@@ -26,8 +26,8 @@ import java.util.Date;
 import java.util.Map;
 
 /**
- * AuthController：JWT + Refresh Token 示例
- * 已合并注册与密码重置接口（原 AuthExtraController 的功能）
+ * AuthController：JWT + Refresh Token
+ *
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -69,14 +69,26 @@ public class AuthController {
             User u = userService.findByUsername(req.getUsername());
             Long userId = u != null ? u.getId() : null;
             RefreshToken rt = refreshTokenService.createRefreshToken(userId);
-            return ResponseEntity.ok(ApiResponse.ok(Map.of(
-                    "accessToken", jwtProperties.getTokenPrefix() + accessToken,
-                    "expiresIn", jwtProperties.getExpirationSeconds(),
-                    "refreshToken", rt.getToken()
-            )));
+            // Include basic user info in the login response so frontend can detect roles
+            return getResponseEntity(accessToken, u, rt);
         } catch (AuthenticationException ex) {
             return ResponseEntity.status(401).body(ApiResponse.fail("用户名或密码错误"));
         }
+    }
+
+    private ResponseEntity<?> getResponseEntity(String accessToken, User u, RefreshToken rt) {
+        Map<String, Object> userInfo = Map.of(
+                "id", u != null ? u.getId() : null,
+                "username", u != null ? u.getUsername() : null,
+                "role", u != null ? u.getRole() : null
+        );
+
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "accessToken", jwtProperties.getTokenPrefix() + accessToken,
+                "expiresIn", jwtProperties.getExpirationSeconds(),
+                "refreshToken", rt.getToken(),
+                "user", userInfo
+        )));
     }
 
     @Operation(summary = "用户登出", description = "使当前 accessToken 失效，可选提供 refreshToken 同时撤销")
@@ -116,11 +128,9 @@ public class AuthController {
                 return ResponseEntity.status(400).body(ApiResponse.fail("用户不存在"));
             }
             String accessToken = jwtTokenUtil.generateToken(username);
-            return ResponseEntity.ok(ApiResponse.ok(Map.of(
-                    "accessToken", jwtProperties.getTokenPrefix() + accessToken,
-                    "expiresIn", jwtProperties.getExpirationSeconds(),
-                    "refreshToken", dbRt.getToken()
-            )));
+            // also include user info on refresh so frontend can keep role info if needed
+            User u = userService.findByUsername(username);
+            return getResponseEntity(accessToken, u, dbRt);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(400).body(ApiResponse.fail(ex.getMessage()));
         }

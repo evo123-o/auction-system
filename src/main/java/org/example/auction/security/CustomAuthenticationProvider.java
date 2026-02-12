@@ -14,15 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * 简单的 AuthenticationProvider：直接使用 UserDetailsService + PasswordEncoder 验证用户名/密码。
  * 目的：避免对 DaoAuthenticationProvider.setUserDetailsService 的依赖（兼容性更好）。
  */
-public class CustomAuthenticationProvider implements AuthenticationProvider {
-
-    private final UserDetailsService userDetailsService;
-    private final PasswordEncoder passwordEncoder;
-
-    public CustomAuthenticationProvider(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-        this.userDetailsService = userDetailsService;
-        this.passwordEncoder = passwordEncoder;
-    }
+public record CustomAuthenticationProvider(UserDetailsService userDetailsService,
+                                           PasswordEncoder passwordEncoder) implements AuthenticationProvider {
 
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {

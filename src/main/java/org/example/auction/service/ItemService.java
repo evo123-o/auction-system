@@ -15,6 +15,11 @@ public interface ItemService {
     Item startAuction(Long id);
 
     /**
+     * 停止拍卖（由拍品的创建者或管理员触发），将状态置为 CLOSED
+     */
+    Item stopAuction(Long id);
+
+    /**
      * 分页查询（支持简单的按 title/category/status ���滤）
      */
     IPage<Item> pageItems(Page<Item> page, String title, String category, String status);
@@ -53,7 +58,7 @@ public interface ItemService {
      * 审核拍品
      * @param id 拍品ID
      * @param approved 是否通过
-     * @param reason 拒绝理由（可选）
+     * @param reason 拒绝理由
      * @return 更新后的拍品
      */
     Item audit(Long id, boolean approved, String reason);

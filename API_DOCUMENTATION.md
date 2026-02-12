@@ -56,7 +56,12 @@
       "data": {
         "accessToken": "Bearer eyJhbGciOiJIUzI1NiJ9...",
         "expiresIn": 3600,
-        "refreshToken": "uuid-string"
+        "refreshToken": "uuid-string",
+        "user": {
+          "id": 1,
+          "username": "user1",
+          "role": "ADMIN"
+        }
       }
     }
     ```
@@ -205,6 +210,18 @@
 *   **URL**: `/api/items/{id}/start`
 *   **Method**: `POST`
 *   **Description**: 将拍品状态置为 RUNNING，仅创建者或管理员可操作。
+
+### 2.8 审核拍品 (需 ADMIN)
+*   **URL**: `/api/items/{id}/audit`
+*   **Method**: `POST`
+*   **Description**: 管理员审核拍品，通过后状态变为 ON_SHELF，拒绝后变为 REJECTED。
+*   **Request Body**:
+    ```json
+    {
+      "approved": true,
+      "reason": "通过申请"
+    }
+    ```
 
 ## 3. 竞拍管理 (Bids)
 
@@ -360,15 +377,48 @@
 
 ## 9. 管理员接口 (Admin)
 
-### 9.1 用户管理
+### 9.1 用户管理 (需 ADMIN)
 *   **Base URL**: `/api/admin/users`
-*   **List (GET)**: `/api/admin/users?page=1&size=20`
-*   **Detail (GET)**: `/api/admin/users/{id}`
-*   **Create (POST)**: `/api/admin/users`
-*   **Update (PUT)**: `/api/admin/users/{id}`
-*   **Delete (DELETE)**: `/api/admin/users/{id}`
 
-### 9.2 竞拍管理
+#### 9.1.1 分页查询用户
+*   **URL**: `/api/admin/users`
+*   **Method**: `GET`
+*   **Query Parameters**: `page` (默认1), `size` (默认20)
+
+#### 9.1.2 获取用户详情
+*   **URL**: `/api/admin/users/{id}`
+*   **Method**: `GET`
+
+#### 9.1.3 创建用户
+*   **URL**: `/api/admin/users`
+*   **Method**: `POST`
+*   **Request Body**:
+    ```json
+    {
+      "username": "user_name",
+      "password": "password123",
+      "email": "user@example.com",
+      "roles": ["ADMIN"]
+    }
+    ```
+
+#### 9.1.4 更新用户
+*   **URL**: `/api/admin/users/{id}`
+*   **Method**: `PUT`
+*   **Description**: 更新用户权限(roles)或状态(enabled)。
+*   **Request Body**:
+    ```json
+    {
+      "roles": ["USER"],
+      "enabled": true
+    }
+    ```
+
+#### 9.1.5 删除用户
+*   **URL**: `/api/admin/users/{id}`
+*   **Method**: `DELETE`
+
+### 9.2 竞拍管理 (需 ADMIN)
 *   **List Bids (GET)**: `/api/admin/bids?page=1&size=20`
 *   **Cancel Bid (DELETE)**: `/api/admin/bids/{id}`
 

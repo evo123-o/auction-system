@@ -74,7 +74,7 @@ public class EndAuctionScheduler {
                         notificationService.notifyUser(d.getUserId(),
                                 "Item " + item.getId() + " ended with no bids, your deposit has been refunded.");
                     } catch (Exception ignored) {
-                        // 可记录日志：某些记录可能已被处理或状态异常
+
                     }
                 }
 
@@ -107,11 +107,10 @@ public class EndAuctionScheduler {
                 }
             }
 
-            // 生成 HTML 凭证（可选）
+            // 生成 HTML 凭证
             String receiptPath = orderService.generateReceiptHtml(order);
             if (receiptPath != null) {
                 order.setReceiptPath(receiptPath);
-                // 如需持久化 receiptPath，请在 OrderService 中添加 update 持久化逻辑
             }
 
             // 标记拍品为 SOLD

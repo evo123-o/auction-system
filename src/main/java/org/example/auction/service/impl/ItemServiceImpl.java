@@ -218,4 +218,22 @@ public class ItemServiceImpl implements ItemService {
         return item;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Item stopAuction(Long id) {
+        Item item = itemMapper.selectById(id);
+        if (item == null) throw new IllegalArgumentException("拍品不存在");
+
+        String s = item.getStatus();
+        // 只在 RUNNING 状态下允许结束拍卖
+        if (!"RUNNING".equalsIgnoreCase(s)) {
+            throw new IllegalStateException("只有进行中的拍品才能停止拍卖，目前状态: " + s);
+        }
+
+        item.setStatus("CLOSED");
+        item.setUpdatedAt(LocalDateTime.now());
+        itemMapper.updateById(item);
+        return item;
+    }
+
 }

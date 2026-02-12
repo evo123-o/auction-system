@@ -59,9 +59,11 @@ CREATE TABLE IF NOT EXISTS items (
                                      extend_count INT NOT NULL DEFAULT 0,
                                      max_extend INT NOT NULL DEFAULT 3,
                                      image_path VARCHAR(512),
+                                     reject_reason VARCHAR(255),
                                      created_by BIGINT,
                                      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                      updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+                                     auto_extension TINYINT(1) NOT NULL DEFAULT 0,
                                      CONSTRAINT fk_items_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -168,4 +170,3 @@ CREATE TABLE IF NOT EXISTS breach_records (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
-

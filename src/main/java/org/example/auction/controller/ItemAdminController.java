@@ -50,6 +50,30 @@ public class ItemAdminController {
         return ResponseEntity.ok(ApiResponse.ok(updated));
     }
 
+    @Operation(summary = "停止拍卖", description = "手动停止拍卖，仅创建者或管理员可操作，状态变为 CLOSED")
+    @PostMapping("/{id}/stop")
+    public ResponseEntity<?> stop(@Parameter(description = "拍品ID") @PathVariable Long id) {
+        var optUser = currentUserService.getCurrentUserId();
+        if (optUser.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
+        Long userId = optUser.get();
+
+        Item item = itemService.getById(id);
+        if (item == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("拍品不存在"));
+
+        if (!item.getCreatedBy().equals(userId) && !SecurityUtils.hasRole("ADMIN")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("无权停止该拍品"));
+        }
+
+        try {
+            Item updated = itemService.stopAuction(id);
+            return ResponseEntity.ok(ApiResponse.ok(updated));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
     /**
      * 审核拍品（通过/拒绝）
      */

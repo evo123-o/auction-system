@@ -29,7 +29,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseBody
     public ResponseEntity<@NonNull ApiResponse<String>> handleGenericException(HttpServletRequest req, Exception ex) {
-        // 对开发阶段可以返回消息；生产环境避免泄露内部细节
+
         ApiResponse<String> body = ApiResponse.fail("服务器内部错误: " + ex.getMessage());
         HttpHeaders headers = new HttpHeaders();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).headers(headers).body(body);

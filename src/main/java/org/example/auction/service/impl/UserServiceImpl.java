@@ -82,7 +82,7 @@ public class UserServiceImpl implements UserService {
     @NotNull
     @Override
     public Page<@NonNull User> findAll(@NonNull Pageable pageable) {
-        // 简单实现：查询全部并在内存中分页（适用于用户量不大的测试/管理场景）
+        // 简单实现：查询全部并在内存中分页（适用于用户量不大的测试/管理场景)
         List<User> all = userMapper.selectList(null);
         int total = all.size();
         int pageNumber = pageable.getPageNumber();

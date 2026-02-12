@@ -22,9 +22,9 @@ public class ItemStatusScheduler {
     public void flipStatuses() {
         LocalDateTime now = LocalDateTime.now();
 
-        // 到了开始时间、且尚未结束的，置为 RUNNING
+        // 仅已上架（ON_SHELF）的拍品才允许自动进入 RUNNING
         itemMapper.update(null, new LambdaUpdateWrapper<Item>()
-                .ne(Item::getStatus, "RUNNING")
+                .eq(Item::getStatus, "ON_SHELF")
                 .le(Item::getStartTime, now)
                 .gt(Item::getEndTime, now)
                 .set(Item::getStatus, "RUNNING")
