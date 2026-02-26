@@ -29,12 +29,5 @@ public class ItemStatusScheduler {
                 .gt(Item::getEndTime, now)
                 .set(Item::getStatus, "RUNNING")
                 .set(Item::getUpdatedAt, now));
-
-        // 到了结束时间的，把 RUNNING 置为 CLOSED
-        itemMapper.update(null, new LambdaUpdateWrapper<Item>()
-                .eq(Item::getStatus, "RUNNING")
-                .le(Item::getEndTime, now)
-                .set(Item::getStatus, "CLOSED")
-                .set(Item::getUpdatedAt, now));
     }
 }
