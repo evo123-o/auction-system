@@ -16,40 +16,99 @@
 - **登录逻辑**：`AuthController#login` 使用 Spring Security 的 `AuthenticationManager` 完成认证，生成 JWT + Refresh Token。
 - **权限校验**：`SecurityConfig` 统一配置 JWT 过滤器与开放/受保护的 API 路径，实现对接口的访问控制。
 
-代码示例（注册/登录）：
+#### 核心代码片段
+
+1. **用户认证控制器 (AuthController)**
 
 ```java
 // src/main/java/org/example/auction/controller/AuthController.java
 @PostMapping("/login")
 public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
-    authenticationManager.authenticate(
-        new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
-    String accessToken = jwtTokenUtil.generateToken(req.getUsername());
-    User u = userService.findByUsername(req.getUsername());
-    Long userId = u != null ? u.getId() : null;
-    RefreshToken rt = refreshTokenService.createRefreshToken(userId);
-    return ResponseEntity.ok(ApiResponse.ok(Map.of(
-        "accessToken", jwtProperties.getTokenPrefix() + accessToken,
-        "refreshToken", rt.getToken())));
+    try {
+        // 1. 调用 AuthenticationManager 进行用户名密码认证
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
+        
+        // 2. 生成 AccessToken
+        String accessToken = jwtTokenUtil.generateToken(req.getUsername());
+        
+        // 3. 获取用户信息并生成 RefreshToken
+        User u = userService.findByUsername(req.getUsername());
+        Long userId = u != null ? u.getId() : null;
+        RefreshToken rt = refreshTokenService.createRefreshToken(userId);
+        
+        // 4. 返回包含 Token 和用户信息的响应
+        return getResponseEntity(accessToken, u, rt);
+    } catch (AuthenticationException ex) {
+        return ResponseEntity.status(401).body(ApiResponse.fail("用户名或密码错误"));
+    }
 }
 
 @PostMapping("/register")
 public ResponseEntity<?> register(@Valid @RequestBody RegisterReq req) {
-    User u = userService.register(req.getUsername(), req.getPassword(), req.getEmail());
-    return ResponseEntity.ok(ApiResponse.ok(u.getUsername()));
+    try {
+        // 调用 Service 层处理注册逻辑
+        User u = userService.register(req.getUsername(), req.getPassword(), req.getEmail());
+        return ResponseEntity.ok(ApiResponse.ok(u.getUsername()));
+    } catch (IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(ex.getMessage()));
+    }
 }
 ```
 
+2. **用户服务逻辑 (UserServiceImpl)**
+
 ```java
 // src/main/java/org/example/auction/service/impl/UserServiceImpl.java
+@Override
+@Transactional(rollbackFor = Exception.class)
 public User register(String username, String rawPassword, String email) {
+    // 1. 唯一性校验
     if (existsByUsername(username)) throw new IllegalArgumentException("用户名已存在");
     if (email != null && existsByEmail(email)) throw new IllegalArgumentException("邮箱已被使用");
+
+    // 2. 创建用户实体并设置初始状态
     User u = new User();
-    u.setPassword(encoder.encode(rawPassword));
+    u.setUsername(username);
+    u.setPassword(encoder.encode(rawPassword)); // BCrypt加密
+    u.setEmail(email);
     u.setRole("USER");
+    u.setCreditScore(100); // 初始信用分
+    u.setStatus("ACTIVE");
+    u.setCreatedAt(LocalDateTime.now());
+    
+    // 3. 持久化到数据库
     userMapper.insert(u);
     return u;
+}
+```
+
+3. **安全配置 (SecurityConfig)**
+
+```java
+// src/main/java/org/example/auction/config/SecurityConfig.java
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
+    JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtTokenUtil, userDetailsService, jwtProperties, tokenBlacklistService);
+    
+    http
+        .cors(Customizer.withDefaults())
+        .csrf(AbstractHttpConfigurer::disable)
+        .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 无状态会话
+        .authorizeHttpRequests(auth -> auth
+            // 放行公开接口
+            .requestMatchers("/", "/index.html", "/error").permitAll()
+            .requestMatchers("/api/auth/**").permitAll() 
+            .requestMatchers("/uploads/**", "/receipts/**", "/static/**").permitAll()
+            .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+            // 其他接口需认证
+            .anyRequest().authenticated()
+        )
+        .authenticationManager(authenticationManager);
+
+    // 添加 JWT 过滤器
+    http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
 }
 ```
 

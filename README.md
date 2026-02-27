@@ -74,14 +74,6 @@ flowchart LR
   Service --> Storage
 ```
 
-## 系统功能模块图
-
-详细功能模块图见 [SYSTEM_FUNCTION_MODULE_DIAGRAM.md](SYSTEM_FUNCTION_MODULE_DIAGRAM.md)。
-
-## 实体关系图
-
-详细实体关系图见 [ENTITY_RELATIONSHIP_DIAGRAM.md](ENTITY_RELATIONSHIP_DIAGRAM.md)。
-
 ## 快速开始
 
 ### 1. 环境要求
@@ -89,7 +81,7 @@ flowchart LR
 - Java 17+
 - Node.js 20+
 - MySQL 8+
-- Redis (可选，用于缓存和 token 黑名单)
+- Redis
 - Maven 3.8+
 
 ### 2. 后端设置
@@ -112,7 +104,7 @@ SOURCE src/main/resources/schema.sql;
 ```properties
 spring.datasource.url=jdbc:mysql://localhost:3306/auction_db?useSSL=false&serverTimezone=UTC
 spring.datasource.username=root
-spring.datasource.password=your_password
+spring.datasource.password=123456
 ```
 
 #### 2.3 创建测试用户 (可选)
@@ -190,7 +182,7 @@ npm run build
    - 实时价格更新
 
 4. **用户管理**
-   - 个人中心/仪表盘
+   - 个人中心
    - 查看我的拍品
 
 ## API 端点
@@ -248,6 +240,3 @@ npm run build
 ### 3. 前端无法连接后端
 确保后端已启动在 8080 端口，前端配置的代理地址正确。
 
-## 许可证
-
-本项目仅用于学习和演示目的。

@@ -3,6 +3,8 @@ package org.example.auction.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
+
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -37,4 +39,10 @@ public class Order {
     private LocalDateTime payBy; // 最晚支付时间（例如拍卖结束后24小时）
 
     private String receiptPath; // HTML 凭证文件路径
+
+    @TableField(exist = false)
+    private String buyerName;
+
+    @TableField(exist = false)
+    private String sellerName;
 }

@@ -7,7 +7,9 @@ import lombok.Getter;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
 import org.example.auction.entity.Order;
+import org.example.auction.entity.User;
 import org.example.auction.mapper.OrderMapper;
+import org.example.auction.mapper.UserMapper;
 import org.example.auction.service.DepositService;
 import org.example.auction.service.OrderService;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,11 +20,13 @@ import java.io.File;
 import java.io.FileWriter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class OrderServiceImpl implements OrderService {
 
     private final OrderMapper orderMapper;
+    private final UserMapper userMapper;
     @Getter
     private final DepositService depositService;
 
@@ -32,15 +36,18 @@ public class OrderServiceImpl implements OrderService {
     @Value("${app.pay.deadline-hours:24}")
     private int payDeadlineHours;
 
-    public OrderServiceImpl(OrderMapper orderMapper, DepositService depositService) {
+    public OrderServiceImpl(OrderMapper orderMapper, UserMapper userMapper, DepositService depositService) {
         this.depositService = depositService;
         this.orderMapper = orderMapper;
+        this.userMapper = userMapper;
     }
 
 
     @Override
     public Order getById(Long id) {
-        return orderMapper.selectById(id);
+        Order order = orderMapper.selectById(id);
+        if (order != null) fillNames(order);
+        return order;
     }
 
     @Override
@@ -56,6 +63,7 @@ public class OrderServiceImpl implements OrderService {
                 .payBy(LocalDateTime.now().plusHours(payDeadlineHours))
                 .build();
         orderMapper.insert(order);
+        fillNames(order);
         return order;
     }
 
@@ -72,6 +80,7 @@ public class OrderServiceImpl implements OrderService {
             order.setPayBy(LocalDateTime.now());
             orderMapper.updateById(order);
         }
+        fillNames(order);
         return order;
     }
 
@@ -108,7 +117,9 @@ public class OrderServiceImpl implements OrderService {
                 .eq(Order::getBuyerId, buyerId)
                 .eq(status != null && !status.isBlank(), Order::getStatus, status)
                 .orderByDesc(Order::getCreatedAt);
-        return orderMapper.selectPage(page, qw);
+        IPage<Order> result = orderMapper.selectPage(page, qw);
+        fillNames(result.getRecords());
+        return result;
     }
 
     @Override
@@ -117,7 +128,9 @@ public class OrderServiceImpl implements OrderService {
                 .eq(Order::getSellerId, sellerId)
                 .eq(status != null && !status.isBlank(), Order::getStatus, status)
                 .orderByDesc(Order::getCreatedAt);
-        return orderMapper.selectPage(page, qw);
+        IPage<Order> result = orderMapper.selectPage(page, qw);
+        fillNames(result.getRecords());
+        return result;
     }
 
     @Override
@@ -125,7 +138,9 @@ public class OrderServiceImpl implements OrderService {
         LambdaQueryWrapper<Order> qw = new LambdaQueryWrapper<Order>()
                 .eq(status != null && !status.isBlank(), Order::getStatus, status)
                 .orderByDesc(Order::getCreatedAt);
-        return orderMapper.selectPage(page, qw);
+        IPage<Order> result = orderMapper.selectPage(page, qw);
+        fillNames(result.getRecords());
+        return result;
     }
 
     @Override
@@ -140,6 +155,7 @@ public class OrderServiceImpl implements OrderService {
         }
         order.setStatus("SHIPPED");
         orderMapper.updateById(order);
+        fillNames(order);
         return order;
     }
 
@@ -155,7 +171,26 @@ public class OrderServiceImpl implements OrderService {
         }
         order.setStatus("RECEIVED");
         orderMapper.updateById(order);
+        fillNames(order);
         return order;
     }
 
+    private void fillNames(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) return;
+        for (Order o : orders) {
+            fillNames(o);
+        }
+    }
+
+    private void fillNames(Order order) {
+        if (order == null) return;
+        if (order.getBuyerId() != null) {
+            User buyer = userMapper.selectById(order.getBuyerId());
+            if (buyer != null) order.setBuyerName(buyer.getUsername());
+        }
+        if (order.getSellerId() != null) {
+            User seller = userMapper.selectById(order.getSellerId());
+            if (seller != null) order.setSellerName(seller.getUsername());
+        }
+    }
 }
