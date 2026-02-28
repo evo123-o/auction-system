@@ -87,23 +87,30 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public String generateReceiptHtml(Order order) {
         try {
+            // 确保订单内含买卖双方名称
+            fillNames(order);
+
             File dir = new File(receiptsDir);
             if (!dir.exists() && !dir.mkdirs()) {
                 throw new IllegalStateException("无法创建目录: " + receiptsDir);
             }
-            String filename = "order-" + order.getId() + ".html";
+            String filename = "凭证-订单-" + (order.getId() != null ? order.getId() : System.currentTimeMillis()) + ".html";
             File f = new File(dir, filename);
+
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            String createdAt = order.getCreatedAt() != null ? order.getCreatedAt().format(fmt) : "";
+            String payBy = order.getPayBy() != null ? order.getPayBy().format(fmt) : "";
+            String buyerName = order.getBuyerName() != null ? order.getBuyerName() : ("用户#" + (order.getBuyerId() != null ? order.getBuyerId() : ""));
+            String sellerName = order.getSellerName() != null ? order.getSellerName() : ("用户#" + (order.getSellerId() != null ? order.getSellerId() : ""));
+            String finalPrice = order.getFinalPrice() != null ? order.getFinalPrice().toString() : "0.00";
+            String status = order.getStatus() != null ? order.getStatus() : "";
+
             try (FileWriter w = new FileWriter(f)) {
-                w.write("<!DOCTYPE html><html><head><meta charset='utf-8'><title>Order Receipt</title></head><body>");
-                w.write("<h2>Order Receipt</h2>");
-                w.write("<p>Order ID: " + order.getId() + "</p>");
-                w.write("<p>Item ID: " + order.getItemId() + "</p>");
-                w.write("<p>Seller ID: " + order.getSellerId() + "</p>");
-                w.write("<p>Buyer ID: " + order.getBuyerId() + "</p>");
-                w.write("<p>Final Price: " + order.getFinalPrice() + "</p>");
-                w.write("<p>Status: " + order.getStatus() + "</p>");
-                w.write("<p>Created At: " + order.getCreatedAt() + "</p>");
-                w.write("</body></html>");
+                w.write("<!doctype html><html><head><meta charset='utf-8'><title>交易凭证</title>");
+                w.write("<style>");
+                w.write("body{font-family:Helvetica,Arial,`微软雅黑`,sans-serif;color:#222;background:#f3f4f6;padding:20px}");
+                w.write(".paper{max-width:800px;margin:0 auto;background:#fff;padding:24px;border:1px solid #e6e6e6}");
+                w.write(".head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #efefef;padding-bottom:12px;margin-bottom:18px}");
             }
             return f.getAbsolutePath();
         } catch (Exception e) {

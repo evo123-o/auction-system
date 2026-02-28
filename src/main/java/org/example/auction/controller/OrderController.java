@@ -11,7 +11,9 @@ import org.example.auction.entity.Order;
 import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.OrderService;
 import org.example.auction.util.SecurityUtils;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType; // Import MediaType
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -194,10 +196,11 @@ public class OrderController {
      * 获取订单的 HTML 凭证
      */
     @Operation(summary = "获取订单凭证", description = "获取订单的HTML凭证，仅买家、卖家或管理员可查看")
-    @GetMapping("/{id}/receipt")
+    @GetMapping(value = "/{id}/receipt", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<?> getReceipt(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
         if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
+
         Order order = orderService.getById(id);
         if (order == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("订单不存在"));
 
@@ -208,10 +211,21 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("无权查看该订单凭证"));
         }
 
+        // 调用生成 HTML 路径的方法
         String receiptPath = orderService.generateReceiptHtml(order);
         if (receiptPath == null) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.fail("凭证生成失败"));
         }
-        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of("receiptPath", receiptPath)));
+
+        java.io.File file = new java.io.File(receiptPath);
+        if (!file.exists()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("凭证文件不存在"));
+        }
+
+        // 返回文件流
+        FileSystemResource resource = new FileSystemResource(file);
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .body(resource);
     }
 }
