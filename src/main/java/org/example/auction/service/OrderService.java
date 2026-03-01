@@ -20,7 +20,7 @@ public interface OrderService {
     Order markPaid(Long orderId);
 
     /**
-     * 生成 HTML 凭证，并返回文件路径
+     * 生成 HTML 凭证内容
      */
     String generateReceiptHtml(Order order);
 

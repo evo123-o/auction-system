@@ -86,36 +86,44 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public String generateReceiptHtml(Order order) {
-        try {
-            // 确保订单内含买卖双方名称
-            fillNames(order);
-
-            File dir = new File(receiptsDir);
-            if (!dir.exists() && !dir.mkdirs()) {
-                throw new IllegalStateException("无法创建目录: " + receiptsDir);
-            }
-            String filename = "凭证-订单-" + (order.getId() != null ? order.getId() : System.currentTimeMillis()) + ".html";
-            File f = new File(dir, filename);
-
-            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            String createdAt = order.getCreatedAt() != null ? order.getCreatedAt().format(fmt) : "";
-            String payBy = order.getPayBy() != null ? order.getPayBy().format(fmt) : "";
-            String buyerName = order.getBuyerName() != null ? order.getBuyerName() : ("用户#" + (order.getBuyerId() != null ? order.getBuyerId() : ""));
-            String sellerName = order.getSellerName() != null ? order.getSellerName() : ("用户#" + (order.getSellerId() != null ? order.getSellerId() : ""));
-            String finalPrice = order.getFinalPrice() != null ? order.getFinalPrice().toString() : "0.00";
-            String status = order.getStatus() != null ? order.getStatus() : "";
-
-            try (FileWriter w = new FileWriter(f)) {
-                w.write("<!doctype html><html><head><meta charset='utf-8'><title>交易凭证</title>");
-                w.write("<style>");
-                w.write("body{font-family:Helvetica,Arial,`微软雅黑`,sans-serif;color:#222;background:#f3f4f6;padding:20px}");
-                w.write(".paper{max-width:800px;margin:0 auto;background:#fff;padding:24px;border:1px solid #e6e6e6}");
-                w.write(".head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #efefef;padding-bottom:12px;margin-bottom:18px}");
-            }
-            return f.getAbsolutePath();
-        } catch (Exception e) {
-            return null;
+        if (order == null) {
+            throw new IllegalArgumentException("order is null");
         }
+        fillNames(order);
+
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String createdAt = order.getCreatedAt() != null ? order.getCreatedAt().format(fmt) : "";
+        String payBy = order.getPayBy() != null ? order.getPayBy().format(fmt) : "";
+        String buyerName = order.getBuyerName() != null ? order.getBuyerName() : ("用户#" + (order.getBuyerId() != null ? order.getBuyerId() : ""));
+        String sellerName = order.getSellerName() != null ? order.getSellerName() : ("用户#" + (order.getSellerId() != null ? order.getSellerId() : ""));
+        String finalPrice = order.getFinalPrice() != null ? order.getFinalPrice().toString() : "0.00";
+        String status = order.getStatus() != null ? order.getStatus() : "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!doctype html><html><head><meta charset='utf-8'><title>交易凭证</title>");
+        sb.append("<style>");
+        sb.append("body{font-family:Helvetica,Arial,\"Microsoft YaHei\",sans-serif;color:#222;background:#f3f4f6;padding:20px}");
+        sb.append(".paper{max-width:800px;margin:0 auto;background:#fff;padding:24px;border:1px solid #e6e6e6}");
+        sb.append(".head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #efefef;padding-bottom:12px;margin-bottom:18px}");
+        sb.append(".meta{color:#666;font-size:14px;margin-bottom:12px}");
+        sb.append(".row{margin:8px 0}");
+        sb.append("</style></head><body>");
+        sb.append("<div class='paper'>");
+        sb.append("<div class='head'><h2>交易凭证</h2><div class='meta'>订单ID: ").append(order.getId() != null ? order.getId() : "").append("</div></div>");
+        sb.append("<div class='row'><strong>买家：</strong>").append(escapeHtml(buyerName)).append("</div>");
+        sb.append("<div class='row'><strong>卖家：</strong>").append(escapeHtml(sellerName)).append("</div>");
+        sb.append("<div class='row'><strong>成交价：</strong>").append(escapeHtml(finalPrice)).append("</div>");
+        sb.append("<div class='row'><strong>状态：</strong>").append(escapeHtml(status)).append("</div>");
+        sb.append("<div class='row'><strong>下单时间：</strong>").append(escapeHtml(createdAt)).append("</div>");
+        sb.append("<div class='row'><strong>支付截止：</strong>").append(escapeHtml(payBy)).append("</div>");
+        sb.append("</div></body></html>");
+
+        return sb.toString();
+    }
+
+    private String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     @Override

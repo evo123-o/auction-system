@@ -11,7 +11,6 @@ import org.example.auction.entity.Order;
 import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.OrderService;
 import org.example.auction.util.SecurityUtils;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType; // Import MediaType
 import org.springframework.http.ResponseEntity;
@@ -211,21 +210,15 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("无权查看该订单凭证"));
         }
 
-        // 调用生成 HTML 路径的方法
-        String receiptPath = orderService.generateReceiptHtml(order);
-        if (receiptPath == null) {
+        // 调用生成 HTML 内容的方法
+        String htmlContent = orderService.generateReceiptHtml(order);
+        if (htmlContent == null) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.fail("凭证生成失败"));
         }
 
-        java.io.File file = new java.io.File(receiptPath);
-        if (!file.exists()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("凭证文件不存在"));
-        }
-
-        // 返回文件流
-        FileSystemResource resource = new FileSystemResource(file);
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
-                .body(resource);
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/html;charset=UTF-8")
+                .body(htmlContent);
     }
 }
