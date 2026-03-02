@@ -11,9 +11,7 @@ import org.example.auction.entity.Order;
 import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.OrderService;
 import org.example.auction.util.SecurityUtils;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType; // Import MediaType
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
@@ -28,8 +26,9 @@ public class OrderController {
 
     private final OrderService orderService;
     private final CurrentUserService currentUserService;
-
-    public OrderController(OrderService orderService, CurrentUserService currentUserService) {
+    private final ReceiptService receiptService;
+    public OrderController(OrderService orderService, CurrentUserService currentUserService ,ReceiptService receiptService) {
+        this.receiptService = receiptService;
         this.orderService = orderService;
         this.currentUserService = currentUserService;
     }
@@ -218,7 +217,23 @@ public class OrderController {
 
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
-                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/html;charset=UTF-8")
+                .header(HttpHeaders.CONTENT_TYPE, "text/html;charset=UTF-8")
                 .body(htmlContent);
+    }
+    @GetMapping("/{orderId}/receipt/pdf")
+    public ResponseEntity<byte[]> exportReceiptPdf(@PathVariable Long orderId) {
+        byte[] pdfBytes = receiptService.generatePdf(orderId);
+
+        if (pdfBytes == null || pdfBytes.length == 0) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new byte[0]);
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.builder("attachment")
+                .filename("order_" + orderId + "_receipt.pdf").build());
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 }
