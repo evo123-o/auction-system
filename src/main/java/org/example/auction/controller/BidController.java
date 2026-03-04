@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.PlaceBidRequest;
+import org.example.auction.dto.PlaceBidResult;
 import org.example.auction.entity.Bid;
 import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.BidService;
@@ -49,8 +50,8 @@ public class BidController {
         }
         Long userId = optUser.get();
         try {
-            Bid bid = bidService.placeBid(userId, req.getItemId(), req.getAmount());
-            return ResponseEntity.ok(ApiResponse.ok(bid));
+            PlaceBidResult result = bidService.placeBid(userId, req.getItemId(), req.getAmount());
+            return ResponseEntity.ok(ApiResponse.ok(result));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(ex.getMessage()));
         } catch (Exception ex) {
@@ -67,8 +68,8 @@ public class BidController {
         }
         Long userId = optUser.get();
         try {
-            Bid bid = bidService.placeBid(userId, itemId, amt.getAmount());
-            return ResponseEntity.ok(ApiResponse.ok(bid));
+            PlaceBidResult result = bidService.placeBid(userId, itemId, amt.getAmount());
+            return ResponseEntity.ok(ApiResponse.ok(result));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(ex.getMessage()));
         } catch (Exception ex) {

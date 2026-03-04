@@ -205,8 +205,14 @@ public class ItemServiceImpl implements ItemService {
         }
 
         if (approved) {
-            item.setStatus("ON_SHELF");
-            // 如之前有被拒绝的原因，批准时应清空
+            // 按“方案一”：审核通过时直接开始拍卖，重算开始/结束时间
+            LocalDateTime now = LocalDateTime.now();
+            int duration = item.getDurationMinutes() != null ? item.getDurationMinutes() : 60; // 默认 60 分钟
+            item.setStartTime(now);
+            item.setEndTime(now.plusMinutes(duration));
+            item.setDurationMinutes(duration);
+            item.setStatus("RUNNING");
+            // 清理拒绝原因
             item.setRejectReason(null);
         } else {
             item.setStatus("REJECTED");

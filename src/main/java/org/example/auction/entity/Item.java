@@ -57,6 +57,9 @@ public class Item {
     @TableField("reject_reason")
     private String rejectReason; // 审核拒绝原因
 
+    @TableField("duration_minutes")
+    private Integer durationMinutes; // 拍卖持续时间，单位：分钟
+
     @TableField("created_by")
     private Long createdBy;
 

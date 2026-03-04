@@ -1,12 +1,10 @@
 package org.example.auction.service;
 
-import lombok.NonNull;
+import org.example.auction.dto.PlaceBidResult;
 import org.example.auction.entity.Bid;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 /**
  * Bid 服务接口
@@ -26,19 +24,19 @@ public interface BidService {
      * @return 保存的出价记录（Bid）
      * @throws IllegalArgumentException 当违反业务规则时
      */
-    Bid placeBid(Long userId, Long itemId, BigDecimal amount);
+    PlaceBidResult placeBid(Long userId, Long itemId, BigDecimal amount);
 
     /**
      * 查询某拍品的所有出价记录
      */
-    List<Bid> listByItem(Long itemId);
+    java.util.List<Bid> listByItem(Long itemId);
 
     // ===== 管理员接口 =====
 
     /**
      * 分页查询所有出价记录
      */
-    Page<@NonNull Bid> pageAll(Pageable pageable);
+    Page<Bid> pageAll(org.springframework.data.domain.Pageable pageable);
 
     /**
      * 撤销出价（管理员操作，若撤销的是最高价需回滚价格）

@@ -4,6 +4,7 @@ import org.example.auction.entity.Item;
 import org.example.auction.entity.Bid;
 import org.example.auction.mapper.ItemMapper;
 import org.example.auction.mapper.BidMapper;
+import org.example.auction.dto.PlaceBidResult;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,7 +80,9 @@ public class BidServiceConcurrencyTest {
                 Long bidderId = bidderBase + idx;
                 BigDecimal bidAmount = new BigDecimal("100").add(new BigDecimal(idx + 1).multiply(new BigDecimal("10"))); // 110,120,...
                 try {
-                    return bidService.placeBid(bidderId, itemId, bidAmount);
+                    // place bid now returns PlaceBidResult
+                    PlaceBidResult r = bidService.placeBid(bidderId, itemId, bidAmount);
+                    return r != null ? r.getBid() : null;
                 } catch (Exception ex) {
                     // for test, we just return null on failure (e.g., bid too low)
                     ex.printStackTrace(); // 打印异常堆栈以进行调试

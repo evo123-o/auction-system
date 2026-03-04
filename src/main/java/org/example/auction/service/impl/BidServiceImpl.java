@@ -2,6 +2,7 @@ package org.example.auction.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.NonNull;
+import org.example.auction.dto.PlaceBidResult;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
 import org.example.auction.mapper.BidMapper;
@@ -40,7 +41,7 @@ public class BidServiceImpl implements BidService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Bid placeBid(Long userId, Long itemId, BigDecimal amount) {
+    public PlaceBidResult placeBid(Long userId, Long itemId, BigDecimal amount) {
         if (userId == null || itemId == null || amount == null) {
             throw new IllegalArgumentException("参数不能为空");
         }
@@ -108,6 +109,10 @@ public class BidServiceImpl implements BidService {
         bid.setBid_time(LocalDateTime.now());
         bidMapper.insert(bid);
 
+        boolean extended = false;
+        LocalDateTime newEnd = null;
+        Integer newExtendCount = item.getExtendCount();
+
         // 使用 LambdaUpdateWrapper 强制更新 Item，确保 SQL 一定执行
         com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Item> updateWrapper = new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
         updateWrapper.eq(Item::getId, item.getId())
@@ -123,14 +128,22 @@ public class BidServiceImpl implements BidService {
             // 如果当前时间在结束时间前N分钟内，且还有延时次数
             if (now.isAfter(thresholdTime) && currentExtendCount < maxExtend) {
                 // 延长结束时间
-                updateWrapper.set(Item::getEndTime, item.getEndTime().plusMinutes(extendMinutes));
+                newEnd = item.getEndTime().plusMinutes(extendMinutes);
+                updateWrapper.set(Item::getEndTime, newEnd);
                 updateWrapper.set(Item::getExtendCount, currentExtendCount + 1);
+                newExtendCount = currentExtendCount + 1;
+                extended = true;
             }
         }
 
         itemMapper.update(null, updateWrapper);
 
-        return bid;
+        return PlaceBidResult.builder()
+                .bid(bid)
+                .extended(extended)
+                .newEndTime(newEnd)
+                .extendCount(newExtendCount)
+                .build();
     }
 
     @Override

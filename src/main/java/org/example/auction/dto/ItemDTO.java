@@ -24,6 +24,7 @@ public class ItemDTO {
     private String status;
     private Integer extendCount;
     private Integer maxExtend;
+    private Integer durationMinutes;
     private String imageUrl;
     private Long createdBy;
     private LocalDateTime createdAt;

@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS items (
                                      start_time DATETIME,
                                      end_time DATETIME,
                                      status VARCHAR(32) NOT NULL DEFAULT 'PENDING', -- PENDING / ON_SHELF / RUNNING / SOLD / CLOSED
+                                    duration_minutes INT NOT NULL DEFAULT 60,
                                      extend_count INT NOT NULL DEFAULT 0,
                                      max_extend INT NOT NULL DEFAULT 3,
                                      image_path VARCHAR(512),

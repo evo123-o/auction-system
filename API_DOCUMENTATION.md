@@ -156,7 +156,7 @@
       "success": true,
       "message": "ok",
       "data": {
-        "records": [ { "id": 1, "title": "...", "currentPrice": 100.0, "..."} ],
+        "records": [ { "id": 1, "title": "Sample Item", "currentPrice": 100.0 } ],
         "total": 50,
         "pages": 5,
         "current": 1,
@@ -181,11 +181,13 @@
       "description": "明代...",
       "startPrice": 100.00,
       "depositAmount": 20.00,
-      "startTime": "2023-10-01T10:00:00",
+      "startTime": "2023-10-01T10:00:00",  
       "endTime": "2023-10-02T10:00:00",
+      "durationMinutes": 120,     
       "autoExtension": true
     }
     ```
+    注：`startTime` 为用户期望的开始时间（可选），实际开拍时间以管理员审核时系统设定为准（审核通过瞬间开始，持续 `durationMinutes`）。
 
 ### 2.4 更新拍品
 *   **URL**: `/api/items/{id}`
@@ -214,7 +216,10 @@
 ### 2.8 审核拍品 (需 ADMIN)
 *   **URL**: `/api/items/{id}/audit`
 *   **Method**: `POST`
-*   **Description**: 管理员审核拍品，通过后状态变为 ON_SHELF，拒绝后变为 REJECTED。
+*   **Description**: 管理员审核拍品。按系统配置（当前实现 - 方案一），审核通过时系统会：
+  - 将 `startTime` 设为审核通过时刻（now）
+  - 将 `endTime` 设为 `startTime + durationMinutes`
+  - 将状态置为 `RUNNING`（立即开始拍卖），若审核不通过则状态置为 `REJECTED`。
 *   **Request Body**:
     ```json
     {
