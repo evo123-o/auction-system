@@ -45,4 +45,8 @@ public class Order {
 
     @TableField(exist = false)
     private String sellerName;
+
+    @TableField("deposit_amount")
+    private BigDecimal depositAmount;
+
 }

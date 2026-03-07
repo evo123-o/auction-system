@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE INDEX idx_evals_order ON evaluations(order_id);
--- breach_records: 额外的违约/处罚记录（如果需要）
+-- breach_records: 违约/处罚记录
 CREATE TABLE IF NOT EXISTS breach_records (
                                               id BIGINT AUTO_INCREMENT PRIMARY KEY,
                                               user_id BIGINT NOT NULL,
