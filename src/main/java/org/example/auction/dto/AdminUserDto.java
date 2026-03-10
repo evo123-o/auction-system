@@ -17,6 +17,7 @@ public class AdminUserDto {
     private String username;
     private String email;
     private String role; // 单一角色
+    private Integer creditScore;
     private Boolean enabled; // map from status
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -28,6 +29,7 @@ public class AdminUserDto {
         d.username = u.getUsername();
         d.email = u.getEmail();
         d.role = u.getRole();
+        d.creditScore = u.getCreditScore();
         d.enabled = "ACTIVE".equalsIgnoreCase(u.getStatus());
         d.createdAt = u.getCreatedAt();
         d.updatedAt = u.getUpdatedAt();

@@ -15,4 +15,8 @@ public class UpdateUserRequest {
     private Set<String> roles;
     private Boolean enabled;
 
+    private String password; // optional, admin can reset password
+    private String email;
+    private String role;     // single role
+    private Integer creditScore;
 }

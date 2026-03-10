@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.Getter;
 import org.example.auction.dto.CreateItemRequest;
 import org.example.auction.entity.Item;
+import org.example.auction.entity.User;
 import org.example.auction.mapper.ItemMapper;
+import org.example.auction.mapper.UserMapper;
 import org.example.auction.service.ItemService;
 import org.example.auction.storage.StorageService;
 import org.springframework.beans.BeanUtils;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 public class ItemServiceImpl implements ItemService {
 
     private final ItemMapper itemMapper;
+    private final UserMapper userMapper;
     private final StorageService storageService;
 
     @Getter
@@ -35,8 +38,12 @@ public class ItemServiceImpl implements ItemService {
     @Value("${app.upload.base-url:/uploads}")
     private String uploadBaseUrl;
 
-    public ItemServiceImpl(ItemMapper itemMapper, StorageService storageService) {
+    @Value("${app.auction.credit-score.min-to-list:60}")
+    private int minCreditScoreToList;
+
+    public ItemServiceImpl(ItemMapper itemMapper, UserMapper userMapper, StorageService storageService) {
         this.itemMapper = itemMapper;
+        this.userMapper = userMapper;
         this.storageService = storageService;
     }
 
@@ -98,6 +105,17 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Item create(CreateItemRequest req, Long createdBy) {
+
+        // Check credit score
+        User user = userMapper.selectById(createdBy);
+        if (user == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        int currentScore = user.getCreditScore() != null ? user.getCreditScore() : 100;
+        if (currentScore < minCreditScoreToList) {
+            throw new IllegalArgumentException("您的信用分过低 (" + currentScore + " < " + minCreditScoreToList + ")，无法发布拍品！");
+        }
+
         Item item = new Item();
         BeanUtils.copyProperties(req, item);
         item.setCreatedBy(createdBy);

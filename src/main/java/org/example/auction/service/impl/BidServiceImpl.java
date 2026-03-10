@@ -5,8 +5,10 @@ import lombok.NonNull;
 import org.example.auction.dto.PlaceBidResult;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
+import org.example.auction.entity.User;
 import org.example.auction.mapper.BidMapper;
 import org.example.auction.mapper.ItemMapper;
+import org.example.auction.mapper.UserMapper;
 import org.example.auction.service.BidService;
 import org.example.auction.service.DepositService;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +24,7 @@ public class BidServiceImpl implements BidService {
 
     private final BidMapper bidMapper;
     private final ItemMapper itemMapper;
+    private final UserMapper userMapper;
     private final DepositService depositService;
 
     @Value("${app.auction.default-extend-minutes:5}")
@@ -33,9 +36,13 @@ public class BidServiceImpl implements BidService {
     @Value("${app.auction.extend-threshold-minutes:5}")
     private int extendThresholdMinutes;
 
-    public BidServiceImpl(BidMapper bidMapper, ItemMapper itemMapper, DepositService depositService) {
+    @Value("${app.auction.credit-score.min-to-bid:60}")
+    private int minCreditScoreToBid;
+
+    public BidServiceImpl(BidMapper bidMapper, ItemMapper itemMapper, UserMapper userMapper, DepositService depositService) {
         this.bidMapper = bidMapper;
         this.itemMapper = itemMapper;
+        this.userMapper = userMapper;
         this.depositService = depositService;
     }
 
@@ -45,6 +52,17 @@ public class BidServiceImpl implements BidService {
         if (userId == null || itemId == null || amount == null) {
             throw new IllegalArgumentException("参数不能为空");
         }
+
+        // --- 信用分检查 ---
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        int currentScore = user.getCreditScore() != null ? user.getCreditScore() : 100;
+        if (currentScore < minCreditScoreToBid) {
+            throw new IllegalArgumentException("您的信用分过低 (" + currentScore + " < " + minCreditScoreToBid + ")，无法参与竞拍！");
+        }
+
         if (amount.compareTo(BigDecimal.valueOf(0.01)) < 0) {
             throw new IllegalArgumentException("出价金额必须大于 0");
         }

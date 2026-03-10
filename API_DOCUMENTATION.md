@@ -60,7 +60,10 @@
         "user": {
           "id": 1,
           "username": "user1",
-          "role": "ADMIN"
+          "email": "user@example.com",
+          "role": "ADMIN",
+          "creditScore": 100,
+          "status": "ACTIVE"
         }
       }
     }
@@ -187,7 +190,9 @@
       "autoExtension": true
     }
     ```
-    注：`startTime` 为用户期望的开始时间（可选），实际开拍时间以管理员审核时系统设定为准（审核通过瞬间开始，持续 `durationMinutes`）。
+    注：
+    1. `startTime` 为用户期望的开始时间（可选），实际开拍时间以管理员审核时系统设定为准（审核通过瞬间开始，持续 `durationMinutes`）。
+    2. 发布拍品需要用户信用分达到系统配置的最低要求（默认60分）。
 
 ### 2.4 更新拍品
 *   **URL**: `/api/items/{id}`
@@ -291,6 +296,9 @@
 *   **URL**: `/api/orders/{id}`
 *   **Method**: `GET`
 *   **Description**: 仅买家、卖家或管理员可查看。
+*   **Response（扩展字段）**： 为支持违约/发货超时功能，订单详情中会包含如下可选字段：
+    - `breachedAt` (可选)：若订单被判定为违约，返回违约发生时间（ISO-8601 字符串）；
+    - `breachRecords` (可选)：数组，包含该订单相关的违约记录（见第 8 节），每条记录至少包含 `reason`, `penaltyAmount`, `creditScoreDelta`, `createdAt`。
 
 ### 5.2 我的订单 (买家视角)
 *   **URL**: `/api/orders/my/buyer`
@@ -310,7 +318,7 @@
 ### 5.5 发货
 *   **URL**: `/api/orders/ship/{id}`
 *   **Method**: `POST`
-*   **Description**: 卖家或管理员标记发货。
+*   **Description**: 卖家或管理员标记发货。如果订单已经被系统判定为 `BREACH`（违约），该接口应返回错误并禁止发货操作。
 
 ### 5.6 确认收货
 *   **URL**: `/api/orders/receive/{id}`
@@ -326,6 +334,17 @@
 *   **Method**: `GET`
 *   **Query Parameters**: `page`, `size`, `status`
 *   **Note**: 需 ADMIN 角色。
+
+### 5.9 发货超时惩罚（系统功能说明）
+* **功能概述**：系统通过定时任务扫描在规定时间内未发货的已支付订单（默认 72 小时），自动对卖家执行“发货超时惩罚”：将订单状态置为 `BREACH`、记录违约、按配置扣减卖家信用分并（可选）对保证金做冻结或没收等处理，并通知交易双方。
+* **触发方式**：后端有定时器 `OverdueShippingScheduler`（cron：`0 */5 * * * *`，每 5 分钟扫描一次），使用 `OrderMapper.findOverdueToShip(hours)` 查询满足条件的订单（默认 `hours=72`，可配置）。
+* **相关配置（application.properties）**：
+  - `app.shipping.ship-by-hours`（int，小时，默认 72）—— 判定发货超时的阈值；
+  - `app.breach.shipping.credit-deduction`（int，默认 10）—— 发货违约扣减卖家信用分；
+  - `app.breach.shipping.deposit-action`（枚举：`FORFEIT` | `FREEZE` | `NONE`，默认 `NONE`）—— 发货违约时对保证金的处理策略（注意：卖家通常没有保证金字段，默认 NONE）。
+* **前端显示/行为建议**：
+  - 订单列表与详情需展示 `BREACH` 状态及 `breachedAt`；若订单为 `BREACH`，禁用发货操作按钮并在详情页展示违约记录；
+  - 推荐前端订阅通知（WebSocket/SSE）以实时反映违约事件。
 
 ## 6. 评价管理 (Evaluations)
 
@@ -379,6 +398,8 @@
 ### 8.1 我的违约记录
 *   **URL**: `/api/breaches`
 *   **Method**: `GET`
+*   **Description**: 查询当前用户的违约记录列表（包含买家未付款违约和卖家未发货违约）。
+*   **返回字段**：`id`, `userId`, `itemId`, `orderId`, `reason`, `penaltyAmount`, `creditScoreDelta`, `createdAt`。
 
 ## 9. 管理员接口 (Admin)
 
@@ -389,10 +410,12 @@
 *   **URL**: `/api/admin/users`
 *   **Method**: `GET`
 *   **Query Parameters**: `page` (默认1), `size` (默认20)
+*   **Response**: 包含 `creditScore` 字段。
 
 #### 9.1.2 获取用户详情
 *   **URL**: `/api/admin/users/{id}`
 *   **Method**: `GET`
+*   **Response**: 包含 `creditScore` 字段。
 
 #### 9.1.3 创建用户
 *   **URL**: `/api/admin/users`
@@ -410,12 +433,15 @@
 #### 9.1.4 更新用户
 *   **URL**: `/api/admin/users/{id}`
 *   **Method**: `PUT`
-*   **Description**: 更新用户权限(roles)或状态(enabled)。
+*   **Description**: 更新用户权限(roles)、状态(enabled)、邮箱、信用分或重置密码。
 *   **Request Body**:
     ```json
     {
-      "roles": ["USER"],
-      "enabled": true
+      "role": "USER",
+      "enabled": true,
+      "email": "newemail@example.com",
+      "password": "newpassword123",
+      "creditScore": 100
     }
     ```
 
@@ -427,7 +453,50 @@
 *   **List Bids (GET)**: `/api/admin/bids?page=1&size=20`
 *   **Cancel Bid (DELETE)**: `/api/admin/bids/{id}`
 
-## 10. 安全设计 (Security Design)
+### 9.3 订单管理/违约干预 (需 ADMIN)
+#### 9.3.1 手动触发发货超时惩罚
+*   **URL**: `/api/admin/orders/{id}/force-shipping-breach`
+*   **Method**: `POST`
+*   **Description**: 仅管理员可调用。对指定订单立即执行发货超时惩罚处理（通常用于测试、调试或手动干预）。
+*   **Response**: 返回更新后的订单信息（状态变为 `BREACH`）。
+
+#### 9.3.2 撤销发货超时惩罚
+*   **URL**: `/api/admin/orders/{id}/revoke-shipping-breach`
+*   **Method**: `POST`
+*   **Description**: 仅管理员可调用。撤销指定订单的发货超时惩罚。
+    *   **效果**：
+        1. 订单状态从 `BREACH` 回滚为 `PAID`（允许卖家重新发货）。
+        2. 卖家信用分回滚（加回被扣除的分数）。
+        3. 对应的违约记录被删除（或标记为已撤销）。
+*   **Response**: 返回更新后的订单信息（状态变为 `PAID`）。
+
+## 10. 配置项与监控（重要）
+
+### 10.1 新增相关配置（application.properties）
+```
+# 发货超时与违约惩罚
+app.shipping.ship-by-hours=72
+app.breach.shipping.credit-deduction=10
+app.breach.shipping.deposit-action=NONE
+
+# 买家未付款违约
+app.breach.payment.credit-deduction=10
+app.breach.payment.deposit-action=FORFEIT
+```
+
+### 10.2 邮件相关健康检查/超时建议
+当应用启用邮件（SMTP）并且 Spring Boot 的 mail 健康检查开启时，应用会在健康检查中尝试连接 SMTP 服务器。如果 SMTP 响应较慢或基本认证被阻止，HealthIndicator 可能会报告延迟或失败。
+
+推荐在 `application.properties` 中添加如下 SMTP 超时设置或关闭 mail 健康检查以避免启动/健康检查时阻塞：
+```
+spring.mail.properties.mail.smtp.connectiontimeout=5000
+spring.mail.properties.mail.smtp.timeout=5000
+spring.mail.properties.mail.smtp.writetimeout=5000
+# 如不需要 mail 健康检查：
+management.health.mail.enabled=false
+```
+
+## 11. 安全设计 (Security Design)
 
 * **用户认证**: 使用 JWT 作为 Access Token，通过 `Authorization: Bearer <token>` 传递；Refresh Token 用于换取新的 Access Token。
 * **授权控制**: Spring Security 统一拦截除 `/api/auth/**`、Swagger、静态资源外的请求；管理员接口需 `ADMIN` 角色；拍品/订单等资源在服务层校验所有者或管理员权限。
@@ -442,3 +511,6 @@
   * Token 黑名单支持 Redis 存储，登出后可撤销访问权限
   * 使用 Bean Validation（`@Valid`）进行输入校验，避免非法参数
   * CORS 当前配置为 `allowedOriginPatterns("*")`（仅适用于开发环境），生产部署前需在 `WebMvcConfig#addCorsMappings` 中限制可信域名（建议使用 `allowedOrigins("https://example.com")` 或明确的域名列表）
+
+---
+

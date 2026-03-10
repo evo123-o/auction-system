@@ -1,6 +1,7 @@
 package org.example.auction.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.example.auction.entity.BreachRecord;
@@ -12,4 +13,10 @@ public interface BreachRecordMapper extends BaseMapper<BreachRecord> {
 
     @Select("SELECT * FROM breach_records WHERE user_id = #{userId} ORDER BY created_at DESC")
     List<BreachRecord> listByUser(Long userId);
+
+    @Select("SELECT * FROM breach_records WHERE order_id = #{orderId} AND reason = '卖家逾期未发货' ORDER BY id DESC LIMIT 1")
+    BreachRecord findLatestShippingBreachByOrderId(Long orderId);
+
+    @Delete("DELETE FROM breach_records WHERE id = #{id}")
+    void deleteByIdHard(Long id);
 }

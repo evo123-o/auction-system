@@ -77,6 +77,19 @@ public class AdminUserServiceImpl implements AdminUserService {
             String first = req.getRoles().iterator().next();
             u.setRole(first);
         }
+        if (req.getRole() != null && !req.getRole().isBlank()) {
+            u.setRole(req.getRole());
+        }
+
+        // update optional fields
+        if (req.getEmail() != null) u.setEmail(req.getEmail());
+        if (req.getCreditScore() != null) u.setCreditScore(req.getCreditScore());
+
+        // Password reset
+        if (req.getPassword() != null && !req.getPassword().isBlank()) {
+            u.setPassword(passwordEncoder.encode(req.getPassword()));
+        }
+
         User saved = userService.saveUser(u);
         return AdminUserDto.fromEntity(saved);
     }

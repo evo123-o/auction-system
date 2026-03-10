@@ -74,6 +74,23 @@ flowchart LR
   Service --> Storage
 ```
 
+## 更新记录 (2026-03-10) -> 信用分机制
+
+### 功能更新
+1. **信用分限制**:
+   - 发布拍品需要用户可能有最低信用分限制 (默认 60)。
+   - 参与竞拍需要用户可能有最低信用分限制 (默认 60)。
+2. **管理员功能**:
+   - 管理员用户列表接口返回 `creditScore`。
+   - 管理员更新用户接口支持修改 `creditScore`。
+
+### 配置项
+在 `application.properties` 中可配置：
+```properties
+app.auction.credit-score.min-to-bid=60
+app.auction.credit-score.min-to-list=60
+```
+
 ## 快速开始
 
 ### 1. 环境要求
@@ -205,38 +222,58 @@ npm run build
 - `POST /api/items/{id}/bid` - 对指定拍品出价
 - `GET /api/bids/history` - 查看出价历史
 
-## 开发说明
+## 新增功能与重要配置
 
-### 前端开发
+### 发货超时惩罚（Shipping Breach）
 
-- 前端使用 Vite 作为构建工具，支持热更新
-- API 请求会自动代理到后端 (配置在 `vite.config.js`)
-- 状态管理使用 Pinia
-- 路由使用 Vue Router 4
+项目新增了“发货超时惩罚”功能，用以在卖家未按时发货时自动执行违约处理。主要要点：
 
-### 后端开发
+- 功能描述：系统会定期扫描已支付但卖家未发货的订单；若超过配置的阈值（默认 72 小时），系统会将订单状态标记为 `BREACH`，记录违约信息、扣减卖家信用分并（可选）对保证金进行冻结或没收；同时通知买卖双方。
+- 触发器（后端）：`OverdueShippingScheduler`（定时任务），默认每 5 分钟扫描一次。
+- 推荐前端改动：订单列表/详情显示 `BREACH` 状态与 `breachedAt` 字段，禁用发货按钮；订阅通知以实时更新界面。
+- **管理员干预**：管理员可通过专用接口手动**强制执行**或**撤销**发货超时惩罚（`POST /api/admin/orders/{id}/force-shipping-breach` 与 `revoke-shipping-breach`）。
 
-- 使用 Spring Security 进行权限控制
-- 使用 JWT 进行无状态认证
-- 使用 MyBatis Plus 简化数据库操作
-- 支持文件上传存储
+### 相关配置（`src/main/resources/application.properties`）
 
-## 测试账号
+以下配置已加入并可在不同环境中调整：
 
-- 用户名: `testuser`
-- 密码: `password123`
+```properties
+# 判定发货超时阈值（小时）
+app.shipping.ship-by-hours=72
 
-- 管理员: `admin`
-- 密码: `password123`
+# 发货违约惩罚配置
+app.breach.shipping.credit-deduction=10
+app.breach.shipping.deposit-action=NONE   # 可选：FORFEIT | FREEZE | NONE
 
-## 常见问题
+# 买家未付款违约（现有/扩展）
+app.breach.payment.credit-deduction=10
+app.breach.payment.deposit-action=FORFEIT
+```
 
-### 1. 跨域问题
-后端已配置 CORS，允许来自 `http://localhost:3000` 的请求。
+### 邮件（SMTP）超时与健康检查
 
-### 2. 数据库连接失败
-检查 MySQL 服务是否启动，以及 `application.properties` 中的配置是否正确。
+如果你启用了邮件发送（SMTP），在启动或健康检查期间应用会尝试连接 SMTP 服务器。若 SMTP 响应较慢或不允许基本认证，可能导致健康检查延迟或失败。
 
-### 3. 前端无法连接后端
-确保后端已启动在 8080 端口，前端配置的代理地址正确。
+建议在 `application.properties` 中增加以下超时配置或在不需要邮件健康检查时将其关闭：
 
+```properties
+spring.mail.properties.mail.smtp.connectiontimeout=5000
+spring.mail.properties.mail.smtp.timeout=5000
+spring.mail.properties.mail.smtp.writetimeout=5000
+# 如不需要 mail 健康检查：
+management.health.mail.enabled=false
+```
+
+### 前端对接要点（快速说明）
+
+- 订单列表/详情应展示 `status`、`breachedAt`、`breachRecords`，当 `status === 'BREACH'` 时禁用发货按钮并显示违约原因。
+- 建议前端通过 WebSocket/SSE 接收实时通知（事件类型示例：`ORDER_BREACH`，内容：`{ type: 'ORDER_BREACH', orderId: 123, breachedAt: '...' }`），收到后刷新对应订单数据并提示用户。
+- 管理员可使用建议的 admin 接口（`POST /api/admin/orders/{id}/force-shipping-breach`）强制触发惩罚以便测试（后端需实现该 admin 接口）。
+
+---
+
+请告诉我是否需要：
+- 我继续在后端实现 `POST /api/admin/orders/{id}/force-shipping-breach` 管理接口并更新 OpenAPI 注释；
+- 我生成一份简短的前端对接样例（Vue 3 + Axios），包含订单列表高亮和禁用发货按钮的完整示例组件。
+
+如果以上修改都满意，我会运行一次项目级错误检查以确保文档/注释没有语法问题。

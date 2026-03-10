@@ -12,5 +12,19 @@ public interface BreachService {
      */
     void handleBreach(Order order);
 
+    /**
+     * 发货超时惩罚（卖家未按时发货）
+     */
+    void handleShippingBreach(Order order);
+
+    /**
+     * 撤销发货超时惩罚（管理员）
+     */
+    void revokeShippingBreach(Order order, Long adminUserId);
+
+    void revokeBreach(Long orderId);
+
     List<BreachRecord> listUserBreaches(Long userId);
+
+    List<BreachRecord> listOrderBreaches(Long orderId);
 }

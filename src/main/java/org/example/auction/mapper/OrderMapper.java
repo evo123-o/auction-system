@@ -2,6 +2,7 @@ package org.example.auction.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.example.auction.dto.CategoryStatsDto;
 import org.example.auction.entity.Order;
@@ -27,4 +28,11 @@ public interface OrderMapper extends BaseMapper<Order> {
 
     @Select("SELECT COUNT(*) FROM orders WHERE status = 'PAID'")
     Long countTotalTransactions();
+
+    /**
+     * 查找已支付但发货超时（创建时间早于 now - hours）的订单
+     * 这里使用 created_at 作为基准：如果需要更精确的发货截止时间，请在 Order 表增加 ship_by 字段并改用该字段。
+     */
+    @Select("SELECT * FROM orders WHERE status = 'PAID' AND created_at <= DATE_SUB(NOW(), INTERVAL #{hours} HOUR)")
+    List<Order> findOverdueToShip(@Param("hours") int hours);
 }

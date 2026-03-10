@@ -9,6 +9,7 @@ import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.PageResponse;
 import org.example.auction.entity.Order;
 import org.example.auction.security.CurrentUserService;
+import org.example.auction.service.BreachService;
 import org.example.auction.service.OrderService;
 import org.example.auction.util.SecurityUtils;
 import org.springframework.http.*;
@@ -27,10 +28,13 @@ public class OrderController {
     private final OrderService orderService;
     private final CurrentUserService currentUserService;
     private final ReceiptService receiptService;
-    public OrderController(OrderService orderService, CurrentUserService currentUserService ,ReceiptService receiptService) {
+    private final BreachService breachService;
+
+    public OrderController(OrderService orderService, CurrentUserService currentUserService, ReceiptService receiptService, BreachService breachService) {
         this.receiptService = receiptService;
         this.orderService = orderService;
         this.currentUserService = currentUserService;
+        this.breachService = breachService;
     }
 
     /**
@@ -49,6 +53,17 @@ public class OrderController {
                 && !SecurityUtils.hasRole("ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("无权查看该订单"));
         }
+
+        // 附加违约信息（如果订单处于BREACH状态，或者曾经有违约记录，都可以查）
+        // 这里简单点，无论状态如何，都尝试加载违约记录
+        java.util.List<org.example.auction.entity.BreachRecord> breaches = breachService.listOrderBreaches(id);
+        if (breaches != null && !breaches.isEmpty()) {
+            order.setBreachRecords(breaches);
+            // 取最早或最晚的违约时间作为 breachedAt
+            // 根据需求，可能是第一次违约时间
+            order.setBreachedAt(breaches.get(0).getCreatedAt());
+        }
+
         return ResponseEntity.ok(ApiResponse.ok(order));
     }
 

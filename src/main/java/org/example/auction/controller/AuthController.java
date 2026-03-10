@@ -77,11 +77,15 @@ public class AuthController {
     }
 
     private ResponseEntity<?> getResponseEntity(String accessToken, User u, RefreshToken rt) {
-        Map<String, Object> userInfo = Map.of(
-                "id", u != null ? u.getId() : null,
-                "username", u != null ? u.getUsername() : null,
-                "role", u != null ? u.getRole() : null
-        );
+        Map<String, Object> userInfo = new java.util.HashMap<>();
+        if (u != null) {
+            userInfo.put("id", u.getId());
+            userInfo.put("username", u.getUsername());
+            userInfo.put("email", u.getEmail());
+            userInfo.put("role", u.getRole());
+            userInfo.put("creditScore", u.getCreditScore());
+            userInfo.put("status", u.getStatus());
+        }
 
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "accessToken", jwtProperties.getTokenPrefix() + accessToken,

@@ -9,6 +9,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 订单
@@ -45,4 +46,10 @@ public class Order {
 
     @TableField(exist = false)
     private String sellerName;
+
+    @TableField(exist = false)
+    private List<BreachRecord> breachRecords;
+
+    @TableField(exist = false)
+    private LocalDateTime breachedAt;
 }
