@@ -38,6 +38,39 @@ public class OrderController {
     }
 
     /**
+     * 统一查询订单列表（买家/卖家）
+     */
+    @Operation(summary = "查询订单列表", description = "根据视图参数查询买家或卖家的订单列表")
+    @GetMapping
+    public ResponseEntity<?> list(
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "订单状态") @RequestParam(required = false) String status,
+            @Parameter(description = "是否卖家视图") @RequestParam(defaultValue = "false") boolean sellerView) {
+
+        Optional<Long> optUserId = currentUserService.getCurrentUserId();
+        if (optUserId.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("未登录"));
+
+        Page<Order> pg = new Page<>(page, size);
+        IPage<Order> results;
+
+        if (sellerView) {
+            results = orderService.pageBySeller(pg, optUserId.get(), status);
+        } else {
+            results = orderService.pageByBuyer(pg, optUserId.get(), status);
+        }
+
+        PageResponse<Order> resp = PageResponse.<Order>builder()
+                .total(results.getTotal())
+                .pages(results.getPages())
+                .current(page)
+                .size(size)
+                .records(results.getRecords())
+                .build();
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
      * 获取订单详情
      */
     @Operation(summary = "获取订单详情", description = "根据订单ID获取订单详情，仅买家、卖家或管理员可查看")

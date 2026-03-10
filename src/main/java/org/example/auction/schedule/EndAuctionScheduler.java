@@ -88,8 +88,15 @@ public class EndAuctionScheduler {
             // 有中标者：生成订单
             Order order = orderService.createOrderFromWinningBid(item, winner);
 
-            // 冻结中标者保证金
-            depositService.freeze(winner.getUserId(), item.getId());
+            // 冻结中标者保证金（如果需要）
+            if (item.getDepositAmount() != null && item.getDepositAmount().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                try {
+                    depositService.freeze(winner.getUserId(), item.getId());
+                } catch (Exception e) {
+                    // 日志记录，防止炸掉整个任务
+                    System.err.println("Failed to freeze deposit for user " + winner.getUserId() + " item " + item.getId() + ": " + e.getMessage());
+                }
+            }
 
             // 退款给非中标者（去重后排除中标者）
             List<Bid> allBids = bidMapper.listByItem(item.getId());

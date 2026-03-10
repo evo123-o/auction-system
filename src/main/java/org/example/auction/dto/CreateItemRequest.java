@@ -35,5 +35,5 @@ public class CreateItemRequest {
     @Min(1)
     private Integer durationMinutes = 60; // 持续时间，单位：分钟，默认 60
 
-    private boolean autoExtension;
+    private Boolean autoExtension;
 }

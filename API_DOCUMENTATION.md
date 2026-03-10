@@ -28,12 +28,6 @@
 * 受保护接口需携带 `Authorization: Bearer <accessToken>`
 * 文件上传使用 `multipart/form-data`
 
-### 0.3 Swagger/OpenAPI 文档
-
-已集成 OpenAPI，启动服务后可通过以下根路径访问文档端点（注意：这些路径不使用 `/api` 前缀）：
-
-* `/swagger-ui/index.html` - 交互式文档
-* `/v3/api-docs` - JSON 规范文档
 
 ## 1. 认证管理 (Authentication)
 

@@ -118,6 +118,12 @@ public class ItemServiceImpl implements ItemService {
 
         Item item = new Item();
         BeanUtils.copyProperties(req, item);
+        // 先提交审核：创建阶段不写入拍卖时间，避免未审核先开拍
+        item.setStartTime(null);
+        item.setEndTime(null);
+        if (item.getAutoExtension() == null) {
+            item.setAutoExtension(Boolean.FALSE);
+        }
         item.setCreatedBy(createdBy);
         item.setCreatedAt(LocalDateTime.now());
         // 默认状态可设为 PENDING
@@ -135,7 +141,28 @@ public class ItemServiceImpl implements ItemService {
         Item item = itemMapper.selectById(id);
         if (item == null) throw new IllegalArgumentException("拍品不存在");
 
+        String statusBefore = item.getStatus();
+        Boolean oldAutoExtension = item.getAutoExtension();
         BeanUtils.copyProperties(req, item);
+        if (req.getAutoExtension() == null) {
+            item.setAutoExtension(oldAutoExtension);
+        }
+
+        // 仅在审核通过后（ON_SHELF）允许设置拍卖时间
+        boolean touchingSchedule = req.getStartTime() != null || req.getEndTime() != null;
+        if (touchingSchedule && !"ON_SHELF".equalsIgnoreCase(statusBefore)) {
+            throw new IllegalStateException("请先通过审核，再设置拍卖时间");
+        }
+
+        if (touchingSchedule) {
+            if (req.getStartTime() == null || req.getEndTime() == null) {
+                throw new IllegalArgumentException("开始时间和结束时间需同时设置");
+            }
+            if (!req.getEndTime().isAfter(req.getStartTime())) {
+                throw new IllegalArgumentException("结束时间必须晚于开始时间");
+            }
+        }
+
         item.setUpdatedAt(LocalDateTime.now());
 
         // 如果之前被拒绝，用户修改后重新变为待审核
@@ -223,13 +250,10 @@ public class ItemServiceImpl implements ItemService {
         }
 
         if (approved) {
-            // 按“方案一”：审核通过时直接开始拍卖，重算开始/结束时间
-            LocalDateTime now = LocalDateTime.now();
-            int duration = item.getDurationMinutes() != null ? item.getDurationMinutes() : 60; // 默认 60 分钟
-            item.setStartTime(now);
-            item.setEndTime(now.plusMinutes(duration));
-            item.setDurationMinutes(duration);
-            item.setStatus("RUNNING");
+            // 审核通过后先上架，等待卖家自行设置开拍时间
+            item.setStatus("ON_SHELF");
+            item.setStartTime(null);
+            item.setEndTime(null);
             // 清理拒绝原因
             item.setRejectReason(null);
         } else {

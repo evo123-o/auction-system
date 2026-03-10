@@ -110,8 +110,14 @@ public class ItemController {
         if (!existing.getCreatedBy().equals(optId.get()) && !SecurityUtils.hasRole("ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("没有权限修改该拍品");
         }
-        Item updated = itemService.update(id, req);
-        return ResponseEntity.ok(toDto(updated));
+        try {
+            Item updated = itemService.update(id, req);
+            return ResponseEntity.ok(toDto(updated));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 
     @Operation(summary = "删除拍品", description = "删除拍品，仅创建者或管理员可操作")

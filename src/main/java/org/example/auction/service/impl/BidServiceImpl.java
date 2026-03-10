@@ -143,8 +143,8 @@ public class BidServiceImpl implements BidService {
             int currentExtendCount = item.getExtendCount() == null ? 0 : item.getExtendCount();
             int maxExtend = item.getMaxExtend() == null ? maxExtendCount : item.getMaxExtend();
 
-            // 如果当前时间在结束时间前N分钟内，且还有延时次数
-            if (now.isAfter(thresholdTime) && currentExtendCount < maxExtend) {
+            // 如果当前时间在结束时间前N分钟内（含边界），且还有延时次数
+            if (!now.isBefore(thresholdTime) && currentExtendCount < maxExtend) {
                 // 延长结束时间
                 newEnd = item.getEndTime().plusMinutes(extendMinutes);
                 updateWrapper.set(Item::getEndTime, newEnd);
