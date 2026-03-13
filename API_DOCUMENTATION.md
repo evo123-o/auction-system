@@ -149,7 +149,7 @@
     *   `size`: 每页数量 (默认10)
     *   `title`: 标题关键字 (可选)
     *   `category`: 分类 (可选)
-    *   `status`: 状态 (PENDING, ON_SHELF, RUNNING, SOLD, CLOSED)
+    *   `status`: 状态 (PENDING, ON_SHELF, RUNNING, SOLD, CLOSED, REJECTED)
 *   **Response**:
     ```json
     {
@@ -213,7 +213,12 @@
 *   **Method**: `POST`
 *   **Description**: 将拍品状态置为 RUNNING，仅创建者或管理员可操作。
 
-### 2.8 审核拍品 (需 ADMIN)
+### 2.8 停止拍卖
+*   **URL**: `/api/items/{id}/stop`
+*   **Method**: `POST`
+*   **Description**: 将拍品状态置为 CLOSED，仅创建者或管理员可操作。
+
+### 2.9 审核拍品 (需 ADMIN)
 *   **URL**: `/api/items/{id}/audit`
 *   **Method**: `POST`
 *   **Description**: 管理员审核拍品。按系统配置（当前实现 - 方案一），审核通过时系统会：
@@ -320,8 +325,14 @@
 ### 5.7 查看订单凭证
 *   **URL**: `/api/orders/{id}/receipt`
 *   **Method**: `GET`
+*   **Description**: 返回 HTML 格式的订单凭证，仅买家、卖家或管理员可查看。
 
-### 5.8 管理员查询所有订单
+### 5.8 导出订单凭证 PDF
+*   **URL**: `/api/orders/{id}/receipt/pdf`
+*   **Method**: `GET`
+*   **Description**: 返回 PDF 格式的订单凭证文件，仅买家、卖家或管理员可下载。
+
+### 5.9 管理员查询所有订单
 *   **URL**: `/api/orders/admin/all`
 *   **Method**: `GET`
 *   **Query Parameters**: `page`, `size`, `status`
