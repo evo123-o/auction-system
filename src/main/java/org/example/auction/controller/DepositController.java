@@ -1,5 +1,6 @@
 package org.example.auction.controller;
 
+import com.alipay.api.AlipayApiException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -8,9 +9,13 @@ import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Deposit;
 import org.example.auction.entity.Item;
 import org.example.auction.security.CurrentUserService;
+import org.example.auction.service.AlipayService;
 import org.example.auction.service.DepositService;
 import org.example.auction.service.ItemService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,14 +34,19 @@ import java.util.UUID;
 @Tag(name = "保证金管理", description = "保证金初始化、支付、状态查询等接口")
 public class DepositController {
 
+    private static final Logger logger = LoggerFactory.getLogger(DepositController.class);
+
     private final DepositService depositService;
     private final ItemService itemService;
     private final CurrentUserService currentUserService;
+    private final AlipayService alipayService;
 
-    public DepositController(DepositService depositService, ItemService itemService, CurrentUserService currentUserService) {
+    public DepositController(DepositService depositService, ItemService itemService,
+                           CurrentUserService currentUserService, AlipayService alipayService) {
         this.depositService = depositService;
         this.itemService = itemService;
         this.currentUserService = currentUserService;
+        this.alipayService = alipayService;
     }
 
     /**
@@ -57,9 +67,9 @@ public class DepositController {
     }
 
     /**
-     * 模拟支付保证金
+     * 模拟支付保证金（测试用）
      */
-    @Operation(summary = "支付保证金", description = "模拟支付保证金")
+    @Operation(summary = "模拟支付保证金", description = "模拟支付保证金（仅测试用）")
     @PostMapping("/pay/{depositId}")
     public ResponseEntity<?> pay(@Parameter(description = "保证金ID") @PathVariable Long depositId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
@@ -76,6 +86,50 @@ public class DepositController {
         String paymentRef = "PAY-" + UUID.randomUUID();
         Deposit d = depositService.markPaid(depositId, paymentRef);
         return ResponseEntity.ok(ApiResponse.ok(Map.of("depositId", d.getId(), "status", d.getStatus(), "paymentRef", d.getPaymentRef())));
+    }
+
+    /**
+     * 支付宝支付保证金
+     */
+    @Operation(summary = "支付宝支付保证金", description = "通过支付宝支付保证金，返回支付表单HTML")
+    @PostMapping(value = "/pay/alipay/{depositId}", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> payWithAlipay(@Parameter(description = "保证金ID") @PathVariable Long depositId) {
+        Optional<Long> optUserId = currentUserService.getCurrentUserId();
+        if (optUserId.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("未登录");
+        }
+
+        // 验证保证金属于当前用户
+        Deposit deposit = depositService.getById(depositId);
+        if (deposit == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("保证金记录不存在");
+        }
+        if (!deposit.getUserId().equals(optUserId.get())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("无权操作该保证金");
+        }
+
+        if ("PAID".equals(deposit.getStatus())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("保证金已支付");
+        }
+
+        try {
+            // 生成商户订单号
+            String outTradeNo = "DEPOSIT-" + depositId + "-" + System.currentTimeMillis();
+            String subject = "拍品保证金";
+            String body = "保证金ID: " + depositId + ", 金额: " + deposit.getAmount();
+
+            // 创建支付宝支付表单
+            String form = alipayService.createPagePay(outTradeNo, deposit.getAmount(), subject, body);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(form);
+
+        } catch (AlipayApiException e) {
+            logger.error("创建支付宝支付订单失败: depositId={}", depositId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("创建支付订单失败: " + e.getMessage());
+        }
     }
 
     /**
