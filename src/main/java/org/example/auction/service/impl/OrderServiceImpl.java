@@ -99,26 +99,23 @@ public class OrderServiceImpl implements OrderService {
         String finalPrice = order.getFinalPrice() != null ? order.getFinalPrice().toString() : "0.00";
         String status = order.getStatus() != null ? order.getStatus() : "";
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("<!doctype html><html><head><meta charset='utf-8'><title>交易凭证</title>");
-        sb.append("<style>");
-        sb.append("body{font-family:Helvetica,Arial,\"Microsoft YaHei\",sans-serif;color:#222;background:#f3f4f6;padding:20px}");
-        sb.append(".paper{max-width:800px;margin:0 auto;background:#fff;padding:24px;border:1px solid #e6e6e6}");
-        sb.append(".head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #efefef;padding-bottom:12px;margin-bottom:18px}");
-        sb.append(".meta{color:#666;font-size:14px;margin-bottom:12px}");
-        sb.append(".row{margin:8px 0}");
-        sb.append("</style></head><body>");
-        sb.append("<div class='paper'>");
-        sb.append("<div class='head'><h2>交易凭证</h2><div class='meta'>订单ID: ").append(order.getId() != null ? order.getId() : "").append("</div></div>");
-        sb.append("<div class='row'><strong>买家：</strong>").append(escapeHtml(buyerName)).append("</div>");
-        sb.append("<div class='row'><strong>卖家：</strong>").append(escapeHtml(sellerName)).append("</div>");
-        sb.append("<div class='row'><strong>成交价：</strong>").append(escapeHtml(finalPrice)).append("</div>");
-        sb.append("<div class='row'><strong>状态：</strong>").append(escapeHtml(status)).append("</div>");
-        sb.append("<div class='row'><strong>下单时间：</strong>").append(escapeHtml(createdAt)).append("</div>");
-        sb.append("<div class='row'><strong>支付截止：</strong>").append(escapeHtml(payBy)).append("</div>");
-        sb.append("</div></body></html>");
-
-        return sb.toString();
+        return "<!doctype html><html><head><meta charset='utf-8'><title>交易凭证</title>" +
+                "<style>" +
+                "body{font-family:Helvetica,Arial,\"Microsoft YaHei\",sans-serif;color:#222;background:#f3f4f6;padding:20px}" +
+                ".paper{max-width:800px;margin:0 auto;background:#fff;padding:24px;border:1px solid #e6e6e6}" +
+                ".head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #efefef;padding-bottom:12px;margin-bottom:18px}" +
+                ".meta{color:#666;font-size:14px;margin-bottom:12px}" +
+                ".row{margin:8px 0}" +
+                "</style></head><body>" +
+                "<div class='paper'>" +
+                "<div class='head'><h2>交易凭证</h2><div class='meta'>订单ID: " + (order.getId() != null ? order.getId() : "") + "</div></div>" +
+                "<div class='row'><strong>买家：</strong>" + escapeHtml(buyerName) + "</div>" +
+                "<div class='row'><strong>卖家：</strong>" + escapeHtml(sellerName) + "</div>" +
+                "<div class='row'><strong>成交价：</strong>" + escapeHtml(finalPrice) + "</div>" +
+                "<div class='row'><strong>状态：</strong>" + escapeHtml(status) + "</div>" +
+                "<div class='row'><strong>下单时间：</strong>" + escapeHtml(createdAt) + "</div>" +
+                "<div class='row'><strong>支付截止：</strong>" + escapeHtml(payBy) + "</div>" +
+                "</div></body></html>";
     }
 
     private String escapeHtml(String s) {
