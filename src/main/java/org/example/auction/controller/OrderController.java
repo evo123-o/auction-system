@@ -11,6 +11,7 @@ import org.example.auction.entity.Order;
 import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.BreachService;
 import org.example.auction.service.OrderService;
+import org.example.auction.service.ReceiptService;
 import org.example.auction.util.SecurityUtils;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
