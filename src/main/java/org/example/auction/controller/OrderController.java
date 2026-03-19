@@ -1,6 +1,5 @@
 package org.example.auction.controller;
 
-import com.alipay.api.AlipayApiException;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,13 +9,10 @@ import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.PageResponse;
 import org.example.auction.entity.Order;
 import org.example.auction.security.CurrentUserService;
-import org.example.auction.service.AlipayService;
 import org.example.auction.service.BreachService;
 import org.example.auction.service.OrderService;
 import org.example.auction.service.ReceiptService;
 import org.example.auction.util.SecurityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,22 +26,17 @@ import java.util.Optional;
 @Tag(name = "订单管理", description = "订单查询、支付、发货、收货等接口")
 public class OrderController {
 
-    private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
-
     private final OrderService orderService;
     private final CurrentUserService currentUserService;
     private final ReceiptService receiptService;
     private final BreachService breachService;
-    private final AlipayService alipayService;
 
     public OrderController(OrderService orderService, CurrentUserService currentUserService,
-                          ReceiptService receiptService, BreachService breachService,
-                          AlipayService alipayService) {
+                          ReceiptService receiptService, BreachService breachService) {
         this.receiptService = receiptService;
         this.orderService = orderService;
         this.currentUserService = currentUserService;
         this.breachService = breachService;
-        this.alipayService = alipayService;
     }
 
     /**
@@ -191,9 +182,9 @@ public class OrderController {
     }
 
     /**
-     * 模拟支付订单：置为 PAID，并在服务内部做解冻/扣款等逻辑（测试用）
+     * 模拟支付订单：置为 PAID，并在服务内部做解冻/扣款等逻辑
      */
-    @Operation(summary = "模拟支付订单", description = "模拟支付订单（仅测试用），仅买家或管理员可操作")
+    @Operation(summary = "支付订单", description = "模拟支付订单，仅买家或管理员可操作")
     @PostMapping("/pay/{id}")
     public ResponseEntity<?> pay(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
@@ -205,51 +196,6 @@ public class OrderController {
         }
         Order paid = orderService.markPaid(id);
         return ResponseEntity.ok(ApiResponse.ok(paid));
-    }
-
-    /**
-     * 支付宝支付订单
-     */
-    @Operation(summary = "支付宝支付订单", description = "通过支付宝支付订单，返回支付表单HTML")
-    @PostMapping(value = "/pay/alipay/{id}", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> payWithAlipay(@Parameter(description = "订单ID") @PathVariable Long id) {
-        Optional<Long> optUserId = currentUserService.getCurrentUserId();
-        if (optUserId.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("未登录");
-        }
-
-        Order order = orderService.getById(id);
-        if (order == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("订单不存在");
-        }
-
-        // 验证权限
-        if (!order.getBuyerId().equals(optUserId.get()) && !SecurityUtils.hasRole("ADMIN")) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("仅买家或管理员可支付订单");
-        }
-
-        if ("PAID".equals(order.getStatus())) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("订单已支付");
-        }
-
-        try {
-            // 生成商户订单号
-            String outTradeNo = "ORDER-" + id + "-" + System.currentTimeMillis();
-            String subject = "拍卖订单付款";
-            String body = "订单ID: " + id + ", 金额: " + order.getFinalPrice();
-
-            // 创建支付宝支付表单
-            String form = alipayService.createPagePay(outTradeNo, order.getFinalPrice(), subject, body);
-
-            return ResponseEntity.ok()
-                    .contentType(MediaType.TEXT_HTML)
-                    .body(form);
-
-        } catch (AlipayApiException e) {
-            logger.error("创建支付宝支付订单失败: orderId={}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("创建支付订单失败: " + e.getMessage());
-        }
     }
 
     /**
