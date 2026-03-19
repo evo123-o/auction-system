@@ -87,7 +87,8 @@ public class BreachServiceImpl implements BreachService {
         // 2) 扣减信用分（阶梯惩罚替换为固定配置值，保留历史计算可选）
         User buyer = userMapper.selectById(buyerId);
         if (buyer != null) {
-            int cs = buyer.getCreditScore() == null ? 0 : buyer.getCreditScore();
+            Integer buyerCreditScore = buyer.getCreditScore();
+            int cs = buyerCreditScore == null ? 0 : buyerCreditScore;
             buyer.setCreditScore(Math.max(0, cs - paymentCreditDeduction));
             userMapper.updateById(buyer);
         }
@@ -165,7 +166,8 @@ public class BreachServiceImpl implements BreachService {
         User seller = userMapper.selectById(sellerId);
         int deduction = shippingCreditDeduction;
         if (seller != null) {
-            int cur = seller.getCreditScore() == null ? 0 : seller.getCreditScore();
+            Integer sellerCreditScore = seller.getCreditScore();
+            int cur = sellerCreditScore == null ? 0 : sellerCreditScore;
             seller.setCreditScore(Math.max(0, cur - deduction));
             userMapper.updateById(seller);
         }
@@ -227,7 +229,8 @@ public class BreachServiceImpl implements BreachService {
         if (rollbackScore > 0) {
             User seller = userMapper.selectById(sellerId);
             if (seller != null) {
-                int cur = seller.getCreditScore() == null ? 0 : seller.getCreditScore();
+                Integer sellerCreditScore = seller.getCreditScore();
+                int cur = sellerCreditScore == null ? 0 : sellerCreditScore;
                 seller.setCreditScore(cur + rollbackScore);
                 userMapper.updateById(seller);
             }
@@ -288,32 +291,28 @@ public class BreachServiceImpl implements BreachService {
 
         String reason = record.getReason();
         Long userId = record.getUserId();
-        int creditDelta = record.getCreditScoreDelta() == null ? 0 : record.getCreditScoreDelta(); // 负数
+        Integer recordCreditDelta = record.getCreditScoreDelta();
+        int creditDelta = recordCreditDelta == null ? 0 : recordCreditDelta;
 
         // 回滚信用分
         if (creditDelta < 0 && userId != null) {
             User u = userMapper.selectById(userId);
             if (u != null) {
-                int current = u.getCreditScore() == null ? 0 : u.getCreditScore();
+                Integer userCreditScore = u.getCreditScore();
+                int current = userCreditScore == null ? 0 : userCreditScore;
                 u.setCreditScore(current - creditDelta); // - (-10) = +10
                 userMapper.updateById(u);
             }
         }
 
         // 回滚订单状态
-        if ("逾期未支付".equals(reason) || "Payment overdue".equals(reason)) {
-            // 买家未支付，回滚到 PENDING_PAYMENT
-            order.setStatus("PENDING_PAYMENT");
-            // 可能还需要恢复保证金? 如果 forfeit 了
-            // 但 forfeit 逻辑复杂，暂不支持自动恢复保证金
-        } else if ("卖家逾期未发货".equals(reason) || "Shipping overdue".equals(reason)) {
-            // 卖家未发货，回滚到 PAID
-            order.setStatus("PAID");
-        } else {
-            // 其他未知原因，默认回滚 PAID? 或者抛异常
-            // 假设默认 PAID，因为如果是 BREACH 状态通常是在交易流程中中断的
-            log.warn("Unknown breach reason: {}, defaulting status rollback to PAID", reason);
-            order.setStatus("PAID");
+        switch (reason) {
+            case "逾期未支付", "Payment overdue" -> order.setStatus("PENDING_PAYMENT");
+            case "卖家逾期未发货", "Shipping overdue" -> order.setStatus("PAID");
+            default -> {
+                log.warn("Unknown breach reason: {}, defaulting status rollback to PAID", reason);
+                order.setStatus("PAID");
+            }
         }
         orderMapper.updateById(order);
 
@@ -336,8 +335,4 @@ public class BreachServiceImpl implements BreachService {
         }
     }
 
-    private int calculateCreditDeduction(Long userId) {
-        // TODO: implement custom logic if needed
-        return paymentCreditDeduction;
-    }
 }

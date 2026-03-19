@@ -1,10 +1,10 @@
 package org.example.auction.service;
 
-import org.example.auction.dto.PlaceBidResult;
+import java.math.BigDecimal;
+
+import org.example.auction.dto.result.PlaceBidResult;
 import org.example.auction.entity.Bid;
 import org.springframework.data.domain.Page;
-
-import java.math.BigDecimal;
 
 /**
  * Bid 服务接口

@@ -59,7 +59,21 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public Item getById(Long id) {
-        return itemMapper.selectById(id);
+        Item item = itemMapper.selectById(id);
+        if (item != null) {
+            // 实时检查状态：如果已上架且到了开始时间，自动变为运行中
+            LocalDateTime now = LocalDateTime.now();
+            if ("ON_SHELF".equalsIgnoreCase(item.getStatus()) && 
+                item.getStartTime() != null && 
+                item.getEndTime() != null && 
+                now.isAfter(item.getStartTime()) && 
+                now.isBefore(item.getEndTime())) {
+                item.setStatus("RUNNING");
+                item.setUpdatedAt(now);
+                itemMapper.updateById(item);
+            }
+        }
+        return item;
     }
 
     @Override
@@ -278,8 +292,10 @@ public class ItemServiceImpl implements ItemService {
             throw new IllegalStateException("只有进行中的拍品才能停止拍卖，目前状态: " + s);
         }
 
+        LocalDateTime now = LocalDateTime.now();
         item.setStatus("CLOSED");
-        item.setUpdatedAt(LocalDateTime.now());
+        item.setEndTime(now); // 更新结束时间为当前时间，确保倒计时立即结束
+        item.setUpdatedAt(now);
         itemMapper.updateById(item);
         return item;
     }

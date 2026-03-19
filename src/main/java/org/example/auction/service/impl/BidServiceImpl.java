@@ -1,8 +1,10 @@
 package org.example.auction.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.NonNull;
-import org.example.auction.dto.PlaceBidResult;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.example.auction.dto.result.PlaceBidResult;
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
 import org.example.auction.entity.User;
@@ -15,9 +17,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
+import lombok.NonNull;
 
 @Service
 public class BidServiceImpl implements BidService {
@@ -58,7 +60,8 @@ public class BidServiceImpl implements BidService {
         if (user == null) {
             throw new IllegalArgumentException("用户不存在");
         }
-        int currentScore = user.getCreditScore() != null ? user.getCreditScore() : 100;
+        Integer creditScore = user.getCreditScore();
+        int currentScore = creditScore == null ? 100 : creditScore;
         if (currentScore < minCreditScoreToBid) {
             throw new IllegalArgumentException("您的信用分过低 (" + currentScore + " < " + minCreditScoreToBid + ")，无法参与竞拍！");
         }
@@ -140,8 +143,10 @@ public class BidServiceImpl implements BidService {
         // 功能 2: 自动延时逻辑
         if (Boolean.TRUE.equals(item.getAutoExtension()) && item.getEndTime() != null) {
             LocalDateTime thresholdTime = item.getEndTime().minusMinutes(extendThresholdMinutes);
-            int currentExtendCount = item.getExtendCount() == null ? 0 : item.getExtendCount();
-            int maxExtend = item.getMaxExtend() == null ? maxExtendCount : item.getMaxExtend();
+            Integer itemExtendCount = item.getExtendCount();
+            Integer itemMaxExtend = item.getMaxExtend();
+            int currentExtendCount = itemExtendCount == null ? 0 : itemExtendCount;
+            int maxExtend = itemMaxExtend == null ? maxExtendCount : itemMaxExtend;
 
             // 如果当前时间在结束时间前N分钟内（含边界），且还有延时次数
             if (!now.isBefore(thresholdTime) && currentExtendCount < maxExtend) {

@@ -1,9 +1,9 @@
 package org.example.auction.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import lombok.Getter;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.example.auction.entity.Bid;
 import org.example.auction.entity.Item;
 import org.example.auction.entity.Order;
@@ -16,11 +16,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
+import lombok.Getter;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -29,9 +29,6 @@ public class OrderServiceImpl implements OrderService {
     private final UserMapper userMapper;
     @Getter
     private final DepositService depositService;
-
-    @Value("${app.receipts.dir:receipts}")
-    private String receiptsDir;
 
     @Value("${app.pay.deadline-hours:24}")
     private int payDeadlineHours;

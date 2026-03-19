@@ -1,21 +1,27 @@
 package org.example.auction.service;
 
-import org.example.auction.entity.Item;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import org.example.auction.dto.result.PlaceBidResult;
 import org.example.auction.entity.Bid;
-import org.example.auction.mapper.ItemMapper;
+import org.example.auction.entity.Item;
 import org.example.auction.mapper.BidMapper;
-import org.example.auction.dto.PlaceBidResult;
+import org.example.auction.mapper.ItemMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.*;
 
 /**
  * 伪并发测试：多个线程同时对同一 item 出价，断言最后的当前价是最高地出价。
@@ -83,9 +89,8 @@ public class BidServiceConcurrencyTest {
                     // place bid now returns PlaceBidResult
                     PlaceBidResult r = bidService.placeBid(bidderId, itemId, bidAmount);
                     return r != null ? r.getBid() : null;
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                     // for test, we just return null on failure (e.g., bid too low)
-                    ex.printStackTrace(); // 打印异常堆栈以进行调试
                     return null;
                 }
             };
