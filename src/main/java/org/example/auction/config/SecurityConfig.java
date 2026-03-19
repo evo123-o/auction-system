@@ -100,7 +100,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()  // 认证接口（登录、注册等）
                         .requestMatchers("/uploads/**", "/receipts/**", "/static/**").permitAll()  // 静态资源和上传文件
                         .requestMatchers("/favicon.ico").permitAll()  // 网站图标
-                        .requestMatchers("/alipay/test-notify", "/alipay/**").permitAll()  // 支付宝回调接口（关键：必须公开）
                         .requestMatchers("/actuator/**").permitAll()  // 监控端点
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()  // API文档
                         .anyRequest().authenticated()  // 其他所有请求都需要认证
