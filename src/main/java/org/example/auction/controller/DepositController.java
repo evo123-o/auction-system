@@ -1,24 +1,30 @@
 package org.example.auction.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.entity.Deposit;
 import org.example.auction.entity.Item;
 import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.DepositService;
 import org.example.auction.service.ItemService;
+import org.example.auction.service.PaymentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 保证金接口：创建/模拟支付/状态查询
@@ -32,11 +38,13 @@ public class DepositController {
     private final DepositService depositService;
     private final ItemService itemService;
     private final CurrentUserService currentUserService;
+    private final PaymentService paymentService;
 
-    public DepositController(DepositService depositService, ItemService itemService, CurrentUserService currentUserService) {
+    public DepositController(DepositService depositService, ItemService itemService, CurrentUserService currentUserService, PaymentService paymentService) {
         this.depositService = depositService;
         this.itemService = itemService;
         this.currentUserService = currentUserService;
+        this.paymentService = paymentService;
     }
 
     /**
@@ -57,9 +65,9 @@ public class DepositController {
     }
 
     /**
-     * 模拟支付保证金
+    * 发起支付宝沙箱支付（异步回调成功后置为 PAID）
      */
-    @Operation(summary = "支付保证金", description = "模拟支付保证金")
+    @Operation(summary = "支付保证金", description = "发起支付宝沙箱支付")
     @PostMapping("/pay/{depositId}")
     public ResponseEntity<?> pay(@Parameter(description = "保证金ID") @PathVariable Long depositId) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
@@ -72,10 +80,8 @@ public class DepositController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("无权操作该保证金"));
         }
 
-        // 模拟支付：生成随机支付单号
-        String paymentRef = "PAY-" + UUID.randomUUID();
-        Deposit d = depositService.markPaid(depositId, paymentRef);
-        return ResponseEntity.ok(ApiResponse.ok(Map.of("depositId", d.getId(), "status", d.getStatus(), "paymentRef", d.getPaymentRef())));
+        Map<String, String> payInfo = paymentService.createDepositPayInfo(deposit);
+        return ResponseEntity.ok(ApiResponse.ok(payInfo));
     }
 
     /**

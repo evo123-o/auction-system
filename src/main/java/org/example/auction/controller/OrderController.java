@@ -1,22 +1,35 @@
 package org.example.auction.controller;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Map;
+import java.util.Optional;
+
 import org.example.auction.dto.ApiResponse;
 import org.example.auction.dto.PageResponse;
 import org.example.auction.entity.Order;
 import org.example.auction.security.CurrentUserService;
 import org.example.auction.service.BreachService;
 import org.example.auction.service.OrderService;
+import org.example.auction.service.PaymentService;
 import org.example.auction.service.ReceiptService;
 import org.example.auction.util.SecurityUtils;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 订单接口：详情查询与模拟支付
@@ -30,12 +43,14 @@ public class OrderController {
     private final CurrentUserService currentUserService;
     private final ReceiptService receiptService;
     private final BreachService breachService;
+    private final PaymentService paymentService;
 
-    public OrderController(OrderService orderService, CurrentUserService currentUserService, ReceiptService receiptService, BreachService breachService) {
+    public OrderController(OrderService orderService, CurrentUserService currentUserService, ReceiptService receiptService, BreachService breachService, PaymentService paymentService) {
         this.receiptService = receiptService;
         this.orderService = orderService;
         this.currentUserService = currentUserService;
         this.breachService = breachService;
+        this.paymentService = paymentService;
     }
 
     /**
@@ -181,9 +196,9 @@ public class OrderController {
     }
 
     /**
-     * 模拟支付订单：置为 PAID，并在服务内部做解冻/扣款等逻辑
+    * 发起支付宝沙箱支付（异步回调成功后置为 PAID）
      */
-    @Operation(summary = "支付订单", description = "模拟支付订单，仅买家或管理员可操作")
+    @Operation(summary = "支付订单", description = "发起支付宝沙箱支付，仅买家或管理员可操作")
     @PostMapping("/pay/{id}")
     public ResponseEntity<?> pay(@Parameter(description = "订单ID") @PathVariable Long id) {
         Optional<Long> optUserId = currentUserService.getCurrentUserId();
@@ -193,8 +208,8 @@ public class OrderController {
         if (!order.getBuyerId().equals(optUserId.get()) && !SecurityUtils.hasRole("ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.fail("仅买家或管理员可支付订单"));
         }
-        Order paid = orderService.markPaid(id);
-        return ResponseEntity.ok(ApiResponse.ok(paid));
+        Map<String, String> payInfo = paymentService.createOrderPayInfo(order);
+        return ResponseEntity.ok(ApiResponse.ok(payInfo));
     }
 
     /**
