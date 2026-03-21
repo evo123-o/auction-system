@@ -1,8 +1,8 @@
 package org.example.auction.service;
 
-import org.example.auction.entity.Evaluation;
-
 import java.util.List;
+
+import org.example.auction.entity.Evaluation;
 
 /**
  * 评价服务接口
@@ -18,6 +18,11 @@ public interface EvaluationService {
      * 获取用户的所有评价
      */
     List<Evaluation> getByReviewerId(Long reviewerId);
+
+    /**
+     * 获取拍品的所有评价
+     */
+    List<Evaluation> getByItemId(Long itemId);
 
     /**
      * 创建评价

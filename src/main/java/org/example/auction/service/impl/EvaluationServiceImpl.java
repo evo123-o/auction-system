@@ -1,6 +1,8 @@
 package org.example.auction.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.example.auction.entity.Evaluation;
 import org.example.auction.entity.Order;
 import org.example.auction.entity.User;
@@ -11,8 +13,7 @@ import org.example.auction.service.EvaluationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 @Service
 public class EvaluationServiceImpl implements EvaluationService {
@@ -35,6 +36,11 @@ public class EvaluationServiceImpl implements EvaluationService {
     @Override
     public List<Evaluation> getByReviewerId(Long reviewerId) {
         return evaluationMapper.findByReviewerId(reviewerId);
+    }
+
+    @Override
+    public List<Evaluation> getByItemId(Long itemId) {
+        return evaluationMapper.findByItemId(itemId);
     }
 
     @Override
@@ -102,7 +108,8 @@ public class EvaluationServiceImpl implements EvaluationService {
             return;
         }
 
-        int currentScore = reviewedUser.getCreditScore() != null ? reviewedUser.getCreditScore() : 100;
+        Integer currentScoreValue = reviewedUser.getCreditScore();
+        int currentScore = currentScoreValue != null ? currentScoreValue : 100;
         int delta = 0;
 
         if (rating >= 4) {
