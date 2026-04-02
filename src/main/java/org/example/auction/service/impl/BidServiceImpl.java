@@ -127,7 +127,7 @@ public class BidServiceImpl implements BidService {
         bid.setItemId(itemId);
         bid.setUserId(userId);
         bid.setAmount(amount);
-        bid.setBid_time(LocalDateTime.now());
+        bid.setBidTime(LocalDateTime.now());
         bidMapper.insert(bid);
 
         boolean extended = false;
@@ -175,7 +175,7 @@ public class BidServiceImpl implements BidService {
                 new LambdaQueryWrapper<Bid>()
                         .eq(Bid::getItemId, itemId)
                         .orderByDesc(Bid::getAmount)
-                        .orderByDesc(Bid::getBid_time)
+                        .orderByDesc(Bid::getBidTime)
         );
     }
 
@@ -185,7 +185,7 @@ public class BidServiceImpl implements BidService {
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageable.getPageNumber() + 1, pageable.getPageSize());
 
         com.baomidou.mybatisplus.core.metadata.IPage<Bid> result = bidMapper.selectPage(mpPage,
-                new LambdaQueryWrapper<Bid>().orderByDesc(Bid::getBid_time));
+                new LambdaQueryWrapper<Bid>().orderByDesc(Bid::getBidTime));
 
         return new org.springframework.data.domain.PageImpl<>(result.getRecords(), pageable, result.getTotal());
     }

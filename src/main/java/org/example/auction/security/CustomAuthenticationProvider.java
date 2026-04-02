@@ -3,6 +3,7 @@ package org.example.auction.security;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -24,6 +25,9 @@ public record CustomAuthenticationProvider(UserDetailsService userDetailsService
         String password = credentials == null ? "" : credentials.toString();
 
         UserDetails user = userDetailsService.loadUserByUsername(username);
+        if (!user.isEnabled()) {
+            throw new DisabledException("账号已封禁，无法登录");
+        }
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BadCredentialsException("用户名或密码错误");
         }

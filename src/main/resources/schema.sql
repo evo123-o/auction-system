@@ -5,13 +5,13 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- Drop in reverse order to avoid FK conflicts when re-running
 DROP TABLE IF EXISTS breach_records;
-DROP TABLE IF EXISTS violations;
 DROP TABLE IF EXISTS evaluations;
 DROP TABLE IF EXISTS logistics;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS deposits;
 DROP TABLE IF EXISTS bids;
 DROP TABLE IF EXISTS items;
+DROP TABLE IF EXISTS password_reset;
 DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS users;
 
@@ -29,6 +29,21 @@ CREATE TABLE IF NOT EXISTS users (
                                      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                      updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- password_reset: 密码重置记录
+CREATE TABLE IF NOT EXISTS password_reset (
+                                              id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                              user_id BIGINT NOT NULL,
+                                              code VARCHAR(32) NOT NULL,
+                                              token VARCHAR(128),
+                                              expires_at DATETIME NOT NULL,
+                                              used TINYINT(1) NOT NULL DEFAULT 0,
+                                              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                              CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE INDEX idx_password_reset_user ON password_reset(user_id);
+CREATE INDEX idx_password_reset_expires_at ON password_reset(expires_at);
 
 -- refresh_tokens: JWT refresh token 存储
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -85,13 +100,13 @@ CREATE TABLE IF NOT EXISTS bids (
 CREATE INDEX idx_bids_item ON bids(item_id);
 CREATE INDEX idx_bids_user ON bids(user_id);
 
--- deposits: 保证金缴纳记录（保留单一定义）
+-- deposits: 保证金缴纳记录
 CREATE TABLE IF NOT EXISTS deposits (
                                         id BIGINT AUTO_INCREMENT PRIMARY KEY,
                                         user_id BIGINT NOT NULL,
                                         item_id BIGINT NULL,
                                         amount DECIMAL(12,2) NOT NULL,
-                                        status VARCHAR(32) NOT NULL DEFAULT 'PAID', -- UNPAID / PAID / FROZEN / REFUNDED / FORFEITED
+                                        status VARCHAR(32) NOT NULL DEFAULT 'PENDING', -- PENDING / PAID / FROZEN / REFUNDED / FORFEITED
                                         payment_ref VARCHAR(255),
                                         paid_at DATETIME,
                                         frozen_at DATETIME,
@@ -105,14 +120,14 @@ CREATE TABLE IF NOT EXISTS deposits (
 CREATE INDEX idx_deposits_user ON deposits(user_id);
 CREATE INDEX idx_deposits_item ON deposits(item_id);
 
--- orders: 成交订单（保留单一定义）
+-- orders: 成交订单
 CREATE TABLE IF NOT EXISTS orders (
                                       id BIGINT AUTO_INCREMENT PRIMARY KEY,
                                       item_id BIGINT NOT NULL,
                                       buyer_id BIGINT NOT NULL,
                                       seller_id BIGINT,
                                       final_price DECIMAL(12,2) NOT NULL,
-                                      status VARCHAR(32) NOT NULL DEFAULT 'AWAIT_PAY', -- AWAIT_PAY / PAID / SHIPPED / RECEIVED / CLOSED / CANCELLED
+                                      status VARCHAR(32) NOT NULL DEFAULT 'PENDING_PAYMENT', -- PENDING_PAYMENT / PAID / SHIPPED / RECEIVED / CLOSED / CANCELLED
                                       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                       paid_at DATETIME,
                                       shipped_at DATETIME,
@@ -154,7 +169,7 @@ CREATE TABLE IF NOT EXISTS evaluations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE INDEX idx_evals_order ON evaluations(order_id);
--- breach_records: 额外的违约/处罚记录（如果需要）
+-- breach_records: 违约/处罚记录
 CREATE TABLE IF NOT EXISTS breach_records (
                                               id BIGINT AUTO_INCREMENT PRIMARY KEY,
                                               user_id BIGINT NOT NULL,

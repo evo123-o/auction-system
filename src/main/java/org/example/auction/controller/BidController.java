@@ -124,8 +124,7 @@ public class BidController {
                         bid.getUserId(),
                         usernameByUserId.get(bid.getUserId()),
                         bid.getAmount(),
-                        bid.getBid_time(),
-                        bid.getBid_time()))
+                    bid.getBidTime()))
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(ApiResponse.ok(result));
@@ -139,17 +138,15 @@ public class BidController {
         private final String username;
         private final BigDecimal amount;
         private final LocalDateTime bidTime;
-        private final LocalDateTime bid_time;
 
         public BidHistoryItem(Long id, Long itemId, Long userId, String username,
-                              BigDecimal amount, LocalDateTime bidTime, LocalDateTime bid_time) {
+                              BigDecimal amount, LocalDateTime bidTime) {
             this.id = id;
             this.itemId = itemId;
             this.userId = userId;
             this.username = username;
             this.amount = amount;
             this.bidTime = bidTime;
-            this.bid_time = bid_time;
         }
     }
 

@@ -1,5 +1,30 @@
 package org.example.auction.controller;
 
+import java.util.Date;
+import java.util.Map;
+
+import org.example.auction.dto.ApiResponse;
+import org.example.auction.dto.LoginRequest;
+import org.example.auction.entity.RefreshToken;
+import org.example.auction.entity.User;
+import org.example.auction.security.JwtProperties;
+import org.example.auction.security.JwtTokenUtil;
+import org.example.auction.security.RefreshTokenService;
+import org.example.auction.security.TokenBlacklistService;
+import org.example.auction.service.PasswordResetService;
+import org.example.auction.service.UserService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,21 +34,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.example.auction.dto.ApiResponse;
-import org.example.auction.dto.LoginRequest;
-import org.example.auction.entity.RefreshToken;
-import org.example.auction.entity.User;
-import org.example.auction.security.*;
-import org.example.auction.service.PasswordResetService;
-import org.example.auction.service.UserService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.Date;
-import java.util.Map;
 
 /**
  * AuthController：JWT + Refresh Token
@@ -65,12 +75,20 @@ public class AuthController {
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
-            String accessToken = jwtTokenUtil.generateToken(req.getUsername());
             User u = userService.findByUsername(req.getUsername());
-            Long userId = u != null ? u.getId() : null;
+            if (u == null) {
+                return ResponseEntity.status(401).body(ApiResponse.fail("用户名或密码错误"));
+            }
+            if (!"ACTIVE".equalsIgnoreCase(u.getStatus())) {
+                return ResponseEntity.status(403).body(ApiResponse.fail("账号已封禁，无法登录"));
+            }
+            String accessToken = jwtTokenUtil.generateToken(req.getUsername());
+            Long userId = u.getId();
             RefreshToken rt = refreshTokenService.createRefreshToken(userId);
             // Include basic user info in the login response so frontend can detect roles
             return getResponseEntity(accessToken, u, rt);
+        } catch (DisabledException ex) {
+            return ResponseEntity.status(403).body(ApiResponse.fail(ex.getMessage()));
         } catch (AuthenticationException ex) {
             return ResponseEntity.status(401).body(ApiResponse.fail("用户名或密码错误"));
         }
@@ -121,8 +139,11 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@Parameter(description = "刷新令牌") @RequestParam("refreshToken") String refreshToken) {
         try {
-            RefreshToken dbRt = refreshTokenService.rotateRefreshToken(refreshToken);
-            Long userId = dbRt.getUserId();
+            RefreshToken existing = refreshTokenService.findByToken(refreshToken);
+            if (existing == null) {
+                return ResponseEntity.status(400).body(ApiResponse.fail("refreshToken 无效"));
+            }
+            Long userId = existing.getUserId();
             String username = null;
             if (userId != null) {
                 User u = userService.findById(userId);
@@ -131,10 +152,20 @@ public class AuthController {
             if (username == null) {
                 return ResponseEntity.status(400).body(ApiResponse.fail("用户不存在"));
             }
+            User user = userService.findByUsername(username);
+            if (user == null) {
+                refreshTokenService.revokeRefreshToken(refreshToken);
+                return ResponseEntity.status(400).body(ApiResponse.fail("用户不存在"));
+            }
+            if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                refreshTokenService.revokeRefreshToken(refreshToken);
+                return ResponseEntity.status(403).body(ApiResponse.fail("账号已封禁，无法刷新令牌"));
+            }
+
+            RefreshToken dbRt = refreshTokenService.rotateRefreshToken(refreshToken);
             String accessToken = jwtTokenUtil.generateToken(username);
             // also include user info on refresh so frontend can keep role info if needed
-            User u = userService.findByUsername(username);
-            return getResponseEntity(accessToken, u, dbRt);
+            return getResponseEntity(accessToken, user, dbRt);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(400).body(ApiResponse.fail(ex.getMessage()));
         }

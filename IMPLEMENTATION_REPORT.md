@@ -27,15 +27,15 @@ public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
     try {
         // 1. 调用 AuthenticationManager 进行用户名密码认证
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword()));
-        
+
         // 2. 生成 AccessToken
         String accessToken = jwtTokenUtil.generateToken(req.getUsername());
-        
+
         // 3. 获取用户信息并生成 RefreshToken
         User u = userService.findByUsername(req.getUsername());
         Long userId = u != null ? u.getId() : null;
         RefreshToken rt = refreshTokenService.createRefreshToken(userId);
-        
+
         // 4. 返回包含 Token 和用户信息的响应
         return getResponseEntity(accessToken, u, rt);
     } catch (AuthenticationException ex) {
@@ -75,7 +75,7 @@ public User register(String username, String rawPassword, String email) {
     u.setCreditScore(100); // 初始信用分
     u.setStatus("ACTIVE");
     u.setCreatedAt(LocalDateTime.now());
-    
+
     // 3. 持久化到数据库
     userMapper.insert(u);
     return u;
@@ -89,7 +89,7 @@ public User register(String username, String rawPassword, String email) {
 @Bean
 public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
     JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtTokenUtil, userDetailsService, jwtProperties, tokenBlacklistService);
-    
+
     http
         .cors(Customizer.withDefaults())
         .csrf(AbstractHttpConfigurer::disable)
@@ -97,7 +97,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http, Authentication
         .authorizeHttpRequests(auth -> auth
             // 放行公开接口
             .requestMatchers("/", "/index.html", "/error").permitAll()
-            .requestMatchers("/api/auth/**").permitAll() 
+            .requestMatchers("/api/auth/**").permitAll()
             .requestMatchers("/uploads/**", "/receipts/**", "/static/**").permitAll()
             .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
             // 其他接口需认证
@@ -117,6 +117,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http, Authentication
 - **发布/更新**：`ItemController#create` 与 `ItemServiceImpl#create` 负责创建拍品并初始化状态；更新时支持审核逻辑与状态重置。
 - **查询**：`ItemController#list` 支持分页与条件筛选，`detail` 获取单个拍品详情。
 - **状态更新**：`ItemStatusScheduler` 定时将已到开始/结束时间的拍品状态更新为 `RUNNING/CLOSED`。
+- **实时状态检查**：`ItemServiceImpl#getById` 在查询时实时检查，如果拍品已上架且当前时间处于开始和结束时间之间，自动将状态更新为 `RUNNING`。
 
 代码示例（创建与状态更新）：
 
@@ -129,6 +130,31 @@ public Item create(CreateItemRequest req, Long createdBy) {
     item.setStatus("PENDING");
     itemMapper.insert(item);
     item.setCurrentPrice(item.getStartPrice());
+    itemMapper.updateById(item);
+    return item;
+}
+
+// 实时状态检查：查询时自动更新状态
+@Override
+public Item getById(Long id) {
+    Item item = itemMapper.selectById(id);
+    if (item != null && "ON_SHELF".equalsIgnoreCase(item.getStatus())) {
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isAfter(item.getStartTime()) && now.isBefore(item.getEndTime())) {
+            item.setStatus("RUNNING");
+            itemMapper.updateById(item);
+        }
+    }
+    return item;
+}
+
+// 停止拍卖时设置结束时间，确保倒计时立即结束
+@Override
+@Transactional
+public Item stopAuction(Long id) {
+    Item item = itemMapper.selectById(id);
+    item.setStatus("CLOSED");
+    item.setEndTime(LocalDateTime.now()); // 立即结束倒计时
     itemMapper.updateById(item);
     return item;
 }
@@ -170,11 +196,11 @@ itemMapper.update(null, updateWrapper
     .set(Item::getUpdatedAt, LocalDateTime.now()));
 ```
 
-### 2.4 订单与支付模块实现（订单创建、状态流转、支付回调处理）
+### 2.4 订单与支付模块实现（订单创建、状态流转、支付宝沙箱支付）
 
 - **订单创建**：`EndAuctionScheduler` 扫描结束的拍卖并选出最高出价者，调用 `OrderServiceImpl#createOrderFromWinningBid` 创建订单。
 - **状态流转**：`OrderServiceImpl` 提供 `markPaid / markShipped / markReceived` 等状态变更方法；`OrderController` 对权限进行校验。
-- **支付回调处理**：当前实现为“模拟支付”接口（`/api/orders/pay/{id}`）；真实支付可在此处对接回调并保持幂等处理。
+- **支付宝沙箱支付**：集成支付宝沙箱环境，支持订单支付和保证金支付，包含支付表单生成、异步通知处理和同步回调跳转。
 
 代码示例（订单创建与支付状态变更）：
 
@@ -201,6 +227,132 @@ public Order markPaid(Long id) {
 }
 ```
 
+#### 支付宝沙箱支付集成
+
+**1. 支付宝配置类 (AlipayProperties)**
+
+```java
+@Component
+@ConfigurationProperties(prefix = "alipay")
+public class AlipayProperties {
+    private String appId;
+    private String merchantPrivateKey;
+    private String alipayPublicKey;
+    private String gatewayUrl;
+    private String notifyUrl;   // 异步通知地址
+    private String returnUrl;   // 同步回调地址
+    // getters and setters...
+}
+```
+
+**2. 支付服务接口 (PaymentService)**
+
+```java
+// src/main/java/org/example/auction/service/PaymentService.java
+public interface PaymentService {
+    Map<String, String> createOrderPayInfo(Order order);
+    Map<String, String> createDepositPayInfo(Deposit deposit);
+    boolean handleAlipayNotify(Map<String, String> params);
+}
+```
+
+**3. 支付宝支付服务实现 (AlipayPaymentServiceImpl)**
+
+```java
+@Service
+public class AlipayPaymentServiceImpl implements PaymentService {
+
+    // 创建订单支付信息
+    @Override
+    public Map<String, String> createOrderPayInfo(Order order) {
+        String outTradeNo = "ORDER_" + order.getId() + "_" + System.currentTimeMillis();
+        String payForm = buildPagePayForm(outTradeNo, order.getFinalPrice(), "拍卖订单支付");
+
+        Map<String, String> result = new HashMap<>();
+        result.put("payForm", payForm);
+        result.put("outTradeNo", outTradeNo);
+        return result;
+    }
+
+    // 处理支付宝异步通知
+    @Override
+    public boolean handleAlipayNotify(Map<String, String> params) {
+        // 验证签名
+        boolean verified = AlipaySignature.rsaCheckV1(params,
+            alipayProperties.getAlipayPublicKey(),
+            alipayProperties.getCharset(),
+            alipayProperties.getSignType());
+        if (!verified) return false;
+
+        String outTradeNo = params.get("out_trade_no");
+        // 根据前缀区分业务类型
+        if (outTradeNo.startsWith("ORDER_")) {
+            orderService.markPaid(parseId(outTradeNo));
+        } else if (outTradeNo.startsWith("DEPOSIT_")) {
+            depositService.markPaid(parseId(outTradeNo), params.get("trade_no"));
+        }
+        return true;
+    }
+
+    // 构建支付宝支付表单
+    private String buildPagePayForm(String outTradeNo, BigDecimal amount, String subject) {
+        AlipayClient client = new DefaultAlipayClient(
+            alipayProperties.getGatewayUrl(),
+            alipayProperties.getAppId(),
+            alipayProperties.getMerchantPrivateKey(),
+            "json", "utf-8",
+            alipayProperties.getAlipayPublicKey(),
+            "RSA2");
+
+        AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
+        request.setNotifyUrl(alipayProperties.getNotifyUrl());
+        request.setReturnUrl(alipayProperties.getReturnUrl());
+        request.setBizContent("{\"out_trade_no\":\"" + outTradeNo + "\",\"product_code\":\"FAST_INSTANT_TRADE_PAY\",\"total_amount\":\"" + amount + "\",\"subject\":\"" + subject + "\"}");
+
+        return client.pageExecute(request).getBody();
+    }
+}
+```
+
+**4. 支付宝回调控制器 (AlipayController)**
+
+```java
+@RestController
+@RequestMapping("/alipay")
+public class AlipayController {
+
+    private final PaymentService paymentService;
+
+    // 异步通知回调（支付宝服务器调用）
+    @PostMapping("/notify")
+    public String notifyCallback(HttpServletRequest request) {
+        Map<String, String> params = new HashMap<>();
+        request.getParameterMap().forEach((k, v) -> params.put(k, v[0]));
+        return paymentService.handleAlipayNotify(params) ? "success" : "failure";
+    }
+
+    // 同步回调跳转（支付完成后跳转回前端）
+    @GetMapping("/return")
+    public ResponseEntity<Void> returnCallback(@RequestParam String out_trade_no,
+                                                @RequestParam String trade_status) {
+        String target = frontendBaseUrl + "/?payResult=" + trade_status + "&outTradeNo=" + out_trade_no;
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(target)).build();
+    }
+}
+```
+
+**5. 订单控制器支付接口 (OrderController)**
+
+```java
+@PostMapping("/pay/{id}")
+public ResponseEntity<?> pay(@PathVariable Long id) {
+    Order order = orderService.getById(id);
+    // 权限校验...
+    Map<String, String> payInfo = paymentService.createOrderPayInfo(order);
+    return ResponseEntity.ok(ApiResponse.ok(payInfo)); // 返回支付表单HTML
+}
+```
+
 ### 2.5 前端页面实现（主要页面效果图与交互）
 
 > 当前仓库仅包含后端实现，以下为与 API 对应的前端页面交互设计示意（可用于前端实现或答辩说明）。
@@ -213,25 +365,37 @@ public Order markPaid(Long id) {
 
 效果图（线框示意）：
 
-| 页面 | 说明 |
-| --- | --- |
-| 首页 | ![首页](docs/screenshots/home.svg) |
-| 拍品列表 | ![拍品列表](docs/screenshots/items-list.svg) |
+| 页面     | 说明                                          |
+| -------- | --------------------------------------------- |
+| 首页     | ![首页](docs/screenshots/home.svg)            |
+| 拍品列表 | ![拍品列表](docs/screenshots/items-list.svg)  |
 | 拍品详情 | ![拍品详情](docs/screenshots/item-detail.svg) |
-| 个人中心 | ![个人中心](docs/screenshots/profile.svg) |
-| 后台管理 | ![后台管理](docs/screenshots/admin.svg) |
+| 个人中心 | ![个人中心](docs/screenshots/profile.svg)     |
+| 后台管理 | ![后台管理](docs/screenshots/admin.svg)       |
 
 ## 3. 关键技术难点与解决方案
 
 1. **高并发竞拍数据一致性**
-   - 难点：多用户同时出价会导致“最高价覆盖”或“脏写”。
+   - 难点：多用户同时出价会导致"最高价覆盖"或"脏写"。
    - 解决方案：在 `BidServiceImpl#placeBid` 中使用 `FOR UPDATE` 对拍品记录加锁，并在事务内完成出价与价格更新，保证一致性。
 
-2. **支付异步通知与幂等处理**
-   - 难点：第三方支付回调可能重复触发，导致订单状态异常。
-   - 解决方案：`OrderServiceImpl#markPaid` 先判断当前状态，确保状态变更幂等；可在此基础上扩展真实支付回调逻辑。
+2. **支付宝沙箱支付集成**
+   - 难点：需要对接支付宝沙箱环境，处理支付表单生成、异步通知验证和同步回调跳转。
+   - 解决方案：
+     - 使用支付宝官方SDK创建支付客户端，生成PC端支付表单。
+     - 配置异步通知地址（notifyUrl）和同步回调地址（returnUrl），通过NATAPP内网穿透实现本地开发环境接收回调。
+     - 在 `AlipayPaymentServiceImpl#handleAlipayNotify` 中使用 `AlipaySignature.rsaCheckV1` 验证回调签名，确保通知来源可信。
+     - 支持订单支付和保证金支付两种业务类型，通过订单号前缀（ORDER*/DEPOSIT*）区分处理逻辑。
 
-3. **拍卖结束与定时任务**
+3. **支付异步通知与幂等处理**
+   - 难点：第三方支付回调可能重复触发，导致订单状态异常。
+   - 解决方案：`OrderServiceImpl#markPaid` 先判断当前状态，确保状态变更幂等；支付宝通知处理中仅处理 `TRADE_SUCCESS` 和 `TRADE_FINISHED` 状态，避免重复处理。
+
+4. **拍卖状态实时同步**
+   - 难点：定时任务更新状态存在延迟，用户查询时可能看到旧状态。
+   - 解决方案：在 `ItemServiceImpl#getById` 中增加实时状态检查逻辑，查询时如果拍品已上架且当前时间在拍卖时间段内，立即更新状态为 `RUNNING`，确保用户看到最新状态。
+
+5. **拍卖结束与定时任务**
    - 难点：需要自动结束拍卖、生成订单、处理保证金与违约。
    - 解决方案：
      - `ItemStatusScheduler` 周期性更新拍品状态。

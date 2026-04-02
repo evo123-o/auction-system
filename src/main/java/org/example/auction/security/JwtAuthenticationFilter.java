@@ -1,19 +1,22 @@
 package org.example.auction.security;
 
-import lombok.NonNull;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import lombok.NonNull;
 
 /**
  * 从 Authorization 头解析 JWT、验证并设置 Authentication
@@ -48,6 +51,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = jwtTokenUtil.getUsernameFromToken(token);
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    if (!userDetails.isEnabled()) {
+                        SecurityContextHolder.clearContext();
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                        response.getWriter().write("{\"success\":false,\"message\":\"账号已封禁\",\"data\":null}");
+                        return;
+                    }
                     UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

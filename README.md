@@ -27,7 +27,7 @@ auction-system/
 │   │   ├── java/
 │   │   └── resources/
 │   └── test/
-├── frontend/               # 前端源码 (Vue3)
+├── web/               # 前端源码 (Vue3)
 │   ├── src/
 │   │   ├── api/           # API 接口
 │   │   ├── views/         # 页面组件
