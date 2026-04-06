@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS items;
 DROP TABLE IF EXISTS password_reset;
 DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS notifications;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -169,6 +170,21 @@ CREATE TABLE IF NOT EXISTS evaluations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE INDEX idx_evals_order ON evaluations(order_id);
+
+-- notifications: 系统消息与通知表
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,                    -- 接收通知的用户ID
+    title VARCHAR(128) NOT NULL,                -- 通知标题 (例如："出价被超越！")
+    content TEXT NOT NULL,                      -- 通知正文内容
+    type VARCHAR(32) NOT NULL DEFAULT 'SYSTEM', -- 类型：SYSTEM(系统)/ALERT(提醒)/MESSAGE(私信)
+    is_read TINYINT(1) NOT NULL DEFAULT 0,      -- 是否已读 (0:未读, 1:已读)
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+
 -- breach_records: 违约/处罚记录
 CREATE TABLE IF NOT EXISTS breach_records (
                                               id BIGINT AUTO_INCREMENT PRIMARY KEY,

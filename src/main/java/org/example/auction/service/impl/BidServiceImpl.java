@@ -13,6 +13,7 @@ import org.example.auction.mapper.ItemMapper;
 import org.example.auction.mapper.UserMapper;
 import org.example.auction.service.BidService;
 import org.example.auction.service.DepositService;
+import org.example.auction.service.NotificationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class BidServiceImpl implements BidService {
     private final ItemMapper itemMapper;
     private final UserMapper userMapper;
     private final DepositService depositService;
+    private final NotificationService notificationService;
 
     @Value("${app.auction.default-extend-minutes:5}")
     private int extendMinutes;
@@ -41,11 +43,12 @@ public class BidServiceImpl implements BidService {
     @Value("${app.auction.credit-score.min-to-bid:60}")
     private int minCreditScoreToBid;
 
-    public BidServiceImpl(BidMapper bidMapper, ItemMapper itemMapper, UserMapper userMapper, DepositService depositService) {
+    public BidServiceImpl(BidMapper bidMapper, ItemMapper itemMapper, UserMapper userMapper, DepositService depositService, NotificationService notificationService) {
         this.bidMapper = bidMapper;
         this.itemMapper = itemMapper;
         this.userMapper = userMapper;
         this.depositService = depositService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -76,6 +79,11 @@ public class BidServiceImpl implements BidService {
                 .last("FOR UPDATE"));
 
         if (item == null) throw new IllegalArgumentException("拍品不存在");
+
+        // 卖家不能对自己发布的商品出价
+        if (item.getCreatedBy() != null && item.getCreatedBy().equals(userId)) {
+            throw new IllegalArgumentException("您不能参与竞拍自己发布的商品！");
+        }
 
         // 基于时间窗口判断
         LocalDateTime now = LocalDateTime.now();
@@ -129,6 +137,17 @@ public class BidServiceImpl implements BidService {
         bid.setAmount(amount);
         bid.setBidTime(LocalDateTime.now());
         bidMapper.insert(bid);
+
+        // 如果存在前一个最高出价者，且不是当前出价用户自己，则发通知
+        if (highestBid != null && !highestBid.getUserId().equals(userId)) {
+            notificationService.notifyUser(
+                highestBid.getUserId(),
+                "ALERT",
+                "出价被超越提醒",
+                String.format("您参与竞拍的商品 '%s'(ID:%d) 刚刚被其他买家(出价 ￥%s)超越！快去看看吧！",
+                        item.getTitle(), itemId, amount)
+            );
+        }
 
         boolean extended = false;
         LocalDateTime newEnd = null;

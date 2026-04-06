@@ -1,21 +1,21 @@
 package org.example.auction.schedule;
 
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.example.auction.entity.Bid;
+import org.example.auction.entity.Deposit;
 import org.example.auction.entity.Item;
 import org.example.auction.entity.Order;
-import org.example.auction.entity.Deposit;
 import org.example.auction.mapper.BidMapper;
-import org.example.auction.mapper.ItemMapper;
 import org.example.auction.mapper.DepositMapper;
+import org.example.auction.mapper.ItemMapper;
 import org.example.auction.service.DepositService;
 import org.example.auction.service.NotificationService;
 import org.example.auction.service.OrderService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * 扫描结束拍品、生成订单、冻结中标者保证金、退款非中标者；
@@ -71,8 +71,12 @@ public class EndAuctionScheduler {
                 for (Deposit d : paidDeposits) {
                     try {
                         depositService.refund(d.getUserId(), item.getId());
-                        notificationService.notifyUser(d.getUserId(),
-                                "Item " + item.getId() + " ended with no bids, your deposit has been refunded.");
+                        notificationService.notifyUser(
+                                d.getUserId(),
+                                "SYSTEM",
+                                "退还保证金通知",
+                                String.format("您参与的拍卖品 '%s'(ID:%d) 因无人出价流拍，您的保证金已退还。", item.getTitle(), item.getId())
+                        );
                     } catch (Exception ignored) {
 
                     }
@@ -80,8 +84,12 @@ public class EndAuctionScheduler {
 
                 item.setStatus("CLOSED");
                 itemMapper.updateById(item);
-                notificationService.notifyUser(item.getCreatedBy(),
-                        "Item " + item.getId() + " closed with no bids. All deposits refunded.");
+                notificationService.notifyUser(
+                        item.getCreatedBy(),
+                        "SYSTEM",
+                        "流拍通知",
+                        String.format("您发布的拍卖品 '%s'(ID:%d) 已结束，但无人参与出价，该商品已流拍。", item.getTitle(), item.getId())
+                );
                 continue;
             }
 
@@ -107,8 +115,12 @@ public class EndAuctionScheduler {
                 if (!bidderId.equals(winner.getUserId())) {
                     try {
                         depositService.refund(bidderId, item.getId());
-                        notificationService.notifyUser(bidderId,
-                                "You did not win item " + item.getId() + ", your deposit has been refunded.");
+                        notificationService.notifyUser(
+                                bidderId,
+                                "SYSTEM",
+                                "拍卖结束及退还保证金通知",
+                                String.format("很遗憾，您未能竞得商品 '%s'(ID:%d)，您的竞拍保证金已解冻并退还至您的账户。", item.getTitle(), item.getId())
+                        );
                     } catch (Exception ignored) {
                     }
                 }
@@ -125,10 +137,20 @@ public class EndAuctionScheduler {
             itemMapper.updateById(item);
 
             // 通知双方
-            notificationService.notifyUser(item.getCreatedBy(),
-                    "Your item " + item.getId() + " sold. Order " + order.getId());
-            notificationService.notifyUser(winner.getUserId(),
-                    "You won item " + item.getId() + ". Order " + order.getId());
+            notificationService.notifyUser(
+                    item.getCreatedBy(),
+                    "ALERT",
+                    "恭喜！您的拍卖品已成功售出",
+                    String.format("您发布的拍卖品 '%s'(ID:%d) 已经结束并由用户竞拍成功！订单(ID:%d)已经生成，对方最终出价为 ￥%s。",
+                            item.getTitle(), item.getId(), order.getId(), winner.getAmount())
+            );
+            notificationService.notifyUser(
+                    winner.getUserId(),
+                    "ALERT",
+                    "恭喜您赢得拍卖！",
+                    String.format("恭喜！您成功竞得了商品 '%s'(ID:%d)！成交价为 ￥%s，订单(ID:%d)已生成。请您尽快前往系统付款中心完成支付操作。",
+                            item.getTitle(), item.getId(), winner.getAmount(), order.getId())
+            );
         }
     }
 }

@@ -44,11 +44,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String header = request.getHeader(jwtProperties.getHeader());
+        String token = null;
         if (StringUtils.hasText(header) && header.startsWith(jwtProperties.getTokenPrefix())) {
-            String token = header.substring(jwtProperties.getTokenPrefix().length());
-            // 黑名单检查
-            if (!blacklistService.isBlacklisted(token) && jwtTokenUtil.validateToken(token)) {
-                String username = jwtTokenUtil.getUsernameFromToken(token);
+            token = header.substring(jwtProperties.getTokenPrefix().length());
+        } else if (StringUtils.hasText(request.getParameter("token"))) {
+            token = request.getParameter("token");
+        }
+
+        // 黑名单检查
+        if (StringUtils.hasText(token) && !blacklistService.isBlacklisted(token) && jwtTokenUtil.validateToken(token)) {
+            String username = jwtTokenUtil.getUsernameFromToken(token);
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                     if (!userDetails.isEnabled()) {
@@ -62,8 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                }
+                SecurityContextHolder.getContext().setAuthentication(auth);
             }
         }
 

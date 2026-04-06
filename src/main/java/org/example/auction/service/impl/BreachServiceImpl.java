@@ -1,6 +1,9 @@
 package org.example.auction.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.example.auction.entity.BreachRecord;
 import org.example.auction.entity.Deposit;
 import org.example.auction.entity.Order;
@@ -17,9 +20,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 @Service
 public class BreachServiceImpl implements BreachService {
@@ -116,8 +117,18 @@ public class BreachServiceImpl implements BreachService {
         orderMapper.updateById(order);
 
         // 5) 通知
-        notificationService.notifyUser(buyerId, String.format("Order %d is BREACH. Deposit action=%s, credit -%d.", order.getId(), paymentDepositAction, paymentCreditDeduction));
-        notificationService.notifyUser(order.getSellerId(), "Buyer breached for order " + order.getId() + ".");
+        notificationService.notifyUser(
+                buyerId,
+                "SYSTEM",
+                "买家违约处罚通知",
+                String.format("您在订单 %d 中因超时未支付已被判定违约。扣除信用分 %d，保证金处理：%s。", order.getId(), paymentCreditDeduction, paymentDepositAction)
+        );
+        notificationService.notifyUser(
+                order.getSellerId(),
+                "SYSTEM",
+                "买家违约通知",
+                String.format("买家因超时未支付，订单 %d 已被撤销。您的商品已流拍，稍后可将其重新上架。", order.getId())
+        );
     }
 
     // 新增发货超时惩罚逻辑
@@ -185,8 +196,18 @@ public class BreachServiceImpl implements BreachService {
         breachRecordMapper.insert(br);
 
         // 通知双方
-        notificationService.notifyUser(sellerId, "Order " + order.getId() + " marked as BREACH for shipping overdue.");
-        notificationService.notifyUser(order.getBuyerId(), "Seller failed to ship for order " + order.getId() + ".");
+        notificationService.notifyUser(
+                sellerId,
+                "SYSTEM",
+                "卖家违约处罚通知",
+                String.format("您在订单 %d 因超时未发货已被判定违约。扣除信用分 %d", order.getId(), shippingCreditDeduction)
+        );
+        notificationService.notifyUser(
+                order.getBuyerId(),
+                "SYSTEM",
+                "卖家违约及退款通知",
+                String.format("由于卖家超时未发货，订单 %d 已被撤销。您的货款与保证金系统将进行后续退化结算，请留意账户变动。", order.getId())
+        );
     }
 
     @Override
@@ -246,12 +267,16 @@ public class BreachServiceImpl implements BreachService {
         // 5) 通知
         notificationService.notifyUser(
                 sellerId,
-                "Order " + order.getId() + " shipping breach has been revoked by admin."
+                "SYSTEM",
+                "违约撤销通知",
+                "管理员已撤销您在订单 " + order.getId() + " 的发货违约处罚。"
         );
         if (order.getBuyerId() != null) {
             notificationService.notifyUser(
                     order.getBuyerId(),
-                    "Shipping breach for order " + order.getId() + " has been revoked by admin."
+                    "SYSTEM",
+                    "订单状态更新通知",
+                    "订单 " + order.getId() + " 的发货违约状态已被管理员撤销，恢复正常流转。"
             );
         }
     }
@@ -320,7 +345,7 @@ public class BreachServiceImpl implements BreachService {
         breachRecordMapper.deleteById(record.getId());
 
         // 通知
-        notificationService.notifyUser(userId, "Breach record for order " + orderId + " has been revoked by admin.");
+        notificationService.notifyUser(userId, "SYSTEM", "违约判断撤回通知", "关于订单 " + orderId + " 的违约判定已被管理员撤销。");
     }
 
     // helper: safe way to find deposit id for item+user; returns null if not found
